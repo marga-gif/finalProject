@@ -33,11 +33,122 @@ let localRequestsCache = [
     }
 ];
 
+const API_BASE = 'http://localhost:5000/api';
 let currentActiveFilter = "all";
 let currentPage = 1;
 let itemsPerPage = 10;
 
-document.addEventListener('DOMContentLoaded', () => {
+function getAdminToken() {
+    const storedAuth = JSON.parse(localStorage.getItem('barangay_admin_auth') || 'null');
+    return storedAuth && storedAuth.idToken ? storedAuth.idToken : null;
+}
+
+function normalizeStatus(status) {
+    const normalized = String(status || '').trim().toLowerCase();
+    if (normalized === 'pending' || normalized === 'pending review') return 'Pending Review';
+    if (normalized === 'processing') return 'Processing';
+    if (normalized === 'ready' || normalized === 'ready for pickup') return 'Ready for Pickup';
+    if (normalized === 'completed') return 'Completed';
+    return 'Pending Review';
+}
+
+function normalizeRequestItem(item) {
+    const createdDate = item.dateSubmitted || item.createdDate || item.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+    return {
+        id: item.id || item.requestId || `req_${Date.now()}`,
+        requestId: item.requestId || `REQ-${String(item.id || Date.now()).slice(-8)}`,
+        citizenName: item.citizenName || item.fullName || item.userDisplayName || 'Unknown Citizen',
+        citizenEmail: item.citizenEmail || item.email || '',
+        documentType: item.documentType || item.category || 'Document Request',
+        dateSubmitted: createdDate,
+        status: normalizeStatus(item.status),
+        category: item.category || '',
+        userId: item.userId || '',
+        purpose: item.purpose || '',
+        adminNotes: item.adminNotes || '',
+    };
+}
+
+function getAdminUser() {
+    try {
+        return JSON.parse(localStorage.getItem('barangay_admin_user') || 'null') || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function checkAdminAuth() {
+    const adminAuth = localStorage.getItem('barangay_admin_auth');
+    const rememberActive = localStorage.getItem('barangay_admin_remembered') === 'true';
+    const isLoggedIn = sessionStorage.getItem('barangay_admin_logged_in') === 'true';
+    if (!adminAuth || (!isLoggedIn && !rememberActive)) {
+        window.location.href = '../auth/index.html';
+        return false;
+    }
+    if (!isLoggedIn && rememberActive) {
+        sessionStorage.setItem('barangay_admin_logged_in', 'true');
+    }
+    return true;
+}
+
+function populateAdminName(selector = 'auth-admin-name') {
+    const adminNameEl = document.getElementById(selector);
+    const adminUser = getAdminUser();
+    if (adminNameEl) {
+        adminNameEl.textContent = adminUser?.fullName || adminUser?.email || 'Admin User';
+    }
+}
+
+function setupLogoutButton() {
+    const logoutBtn = document.getElementById('logout-btn');
+    if (!logoutBtn) return;
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        sessionStorage.removeItem('barangay_admin_logged_in');
+        localStorage.removeItem('barangay_admin_remembered');
+        localStorage.removeItem('barangay_admin_auth');
+        localStorage.removeItem('barangay_admin_user');
+        window.location.href = '../auth/index.html';
+    });
+}
+
+function ensureAdminAuth() {
+    const token = getAdminToken();
+    if (!token) {
+        window.location.href = '../auth/index.html';
+        return null;
+    }
+    return token;
+}
+
+async function loadDocumentRequests() {
+    const token = ensureAdminAuth();
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/government/requests`, {
+            headers: { Authorization: 'Bearer ' + token },
+        });
+
+        if (!response.ok) {
+            throw new Error('Unable to load requests');
+        }
+
+        const data = await response.json();
+        if (Array.isArray(data)) {
+            localRequestsCache = data.map(normalizeRequestItem);
+            console.log(`Loaded ${localRequestsCache.length} document requests from Firestore`);
+        }
+    } catch (error) {
+        console.warn('Document requests load failed:', error);
+        // Keep using mock data if API fails
+    }
+
+    recalculateTabCounts();
+    applyFiltersAndRenderTable();
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
     const responsiveOverride = document.createElement('style');
     responsiveOverride.innerHTML = `
         @media screen and (max-width: 768px) {
@@ -70,19 +181,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     `;
     document.head.appendChild(responsiveOverride);
+    
+    if (!checkAdminAuth()) return;
+    
+    populateAdminName();
     setupMobileMenuBurger();
     setupTabFiltering();
     setupSearchFilters();
     setupDropdownActionToggles();
     setupExportFeatures();
     setupPaginationConfigs();
-    setupLogoutRedirect();
-    
-    const adminNameEl = document.getElementById('auth-admin-name');
-    if (adminNameEl) adminNameEl.textContent = "Admin User";
+    setupLogoutButton();
 
-    recalculateTabCounts();
-    applyFiltersAndRenderTable();
+    // Load data from Firestore before rendering
+    await loadDocumentRequests();
 });
 
 function setupMobileMenuBurger() {
@@ -107,11 +219,11 @@ function recalculateTabCounts() {
     const counts = { all: localRequestsCache.length, pending: 0, processing: 0, ready: 0, completed: 0 };
     
     localRequestsCache.forEach(req => {
-        const stat = String(req.status).toLowerCase();
-        if (stat === 'pending review') counts.pending++;
-        else if (stat === 'processing') counts.processing++;
-        else if (stat === 'ready for pickup') counts.ready++;
-        else if (stat === 'completed') counts.completed++;
+        const stat = (req.status || '').trim();
+        if (stat === 'Pending Review') counts.pending++;
+        else if (stat === 'Processing') counts.processing++;
+        else if (stat === 'Ready for Pickup') counts.ready++;
+        else if (stat === 'Completed') counts.completed++;
     });
     document.getElementById('count-all').innerText = counts.all;
     document.getElementById('count-pending').innerText = counts.pending;
@@ -168,15 +280,15 @@ function applyFiltersAndRenderTable() {
     const queryText = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
     const filteredRequests = localRequestsCache.filter(req => {
-        const stat = String(req.status).toLowerCase();
+        const stat = (req.status || '').trim();
         
         let matchesTab = (currentActiveFilter === "all");
-        if (currentActiveFilter === "pending" && stat === "pending review") matchesTab = true;
-        if (currentActiveFilter === "processing" && stat === "processing") matchesTab = true;
-        if (currentActiveFilter === "ready" && stat === "ready for pickup") matchesTab = true;
-        if (currentActiveFilter === "completed" && stat === "completed") matchesTab = true;
+        if (currentActiveFilter === "pending" && stat === "Pending Review") matchesTab = true;
+        if (currentActiveFilter === "processing" && stat === "Processing") matchesTab = true;
+        if (currentActiveFilter === "ready" && stat === "Ready for Pickup") matchesTab = true;
+        if (currentActiveFilter === "completed" && stat === "Completed") matchesTab = true;
 
-        const textTarget = `${req.requestId} ${req.citizenName} ${req.documentType}`.toLowerCase();
+        const textTarget = `${req.requestId || ''} ${req.citizenName || ''} ${req.documentType || ''}`.toLowerCase();
         const matchesSearch = !queryText || textTarget.includes(queryText);
 
         return matchesTab && matchesSearch;
@@ -224,6 +336,8 @@ function generateTableRowElement(req) {
     else if (req.status === 'Ready for Pickup') triggerClass = 'trigger-ready';
     else if (req.status === 'Completed') triggerClass = 'trigger-completed';
 
+    const rowStatus = req.status || 'Pending Review';
+
     tr.innerHTML = `
         <td><strong>${req.requestId || 'REQ-N/A'}</strong></td>
         <td>${req.citizenName || 'Unknown Citizen'}</td>
@@ -232,17 +346,17 @@ function generateTableRowElement(req) {
         <td>
             <div class="status-select-wrapper" style="position: relative;">
                 <div class="status-trigger ${triggerClass}" onclick="window.toggleStatusDropdown(this)">
-                    <span>${req.status || 'Pending Review'}</span> <i class="fas fa-chevron-down"></i>
+                    <span>${rowStatus}</span> <i class="fas fa-chevron-down"></i>
                 </div>
                 <div class="status-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid var(--border-color); border-radius:6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; min-width: 160px; padding: 4px 0; max-height: 120px; overflow-y: auto;">
-                    <div class="dropdown-item ${req.status === 'Pending Review' ? 'selected' : ''}" style="padding: 10px 14px; cursor: pointer; font-size:13px;" onclick="window.updateLocalDocumentStatus('${req.id}', 'Pending Review', this)">Pending Review</div>
-                    <div class="dropdown-item ${req.status === 'Processing' ? 'selected' : ''}" style="padding: 10px 14px; cursor: pointer; font-size:13px;" onclick="window.updateLocalDocumentStatus('${req.id}', 'Processing', this)">Processing</div>
-                    <div class="dropdown-item ${req.status === 'Ready for Pickup' ? 'selected' : ''}" style="padding: 10px 14px; cursor: pointer; font-size:13px;" onclick="window.updateLocalDocumentStatus('${req.id}', 'Ready for Pickup', this)">Ready for Pickup</div>
-                    <div class="dropdown-item ${req.status === 'Completed' ? 'selected' : ''}" style="padding: 10px 14px; cursor: pointer; font-size:13px;" onclick="window.updateLocalDocumentStatus('${req.id}', 'Completed', this)">Completed</div>
+                    <div class="dropdown-item ${rowStatus === 'Pending Review' ? 'selected' : ''}" style="padding: 10px 14px; cursor: pointer; font-size:13px;" onclick="window.updateLocalDocumentStatus('${req.id}', 'Pending Review')">Pending Review</div>
+                    <div class="dropdown-item ${rowStatus === 'Processing' ? 'selected' : ''}" style="padding: 10px 14px; cursor: pointer; font-size:13px;" onclick="window.updateLocalDocumentStatus('${req.id}', 'Processing')">Processing</div>
+                    <div class="dropdown-item ${rowStatus === 'Ready for Pickup' ? 'selected' : ''}" style="padding: 10px 14px; cursor: pointer; font-size:13px;" onclick="window.updateLocalDocumentStatus('${req.id}', 'Ready for Pickup')">Ready for Pickup</div>
+                    <div class="dropdown-item ${rowStatus === 'Completed' ? 'selected' : ''}" style="padding: 10px 14px; cursor: pointer; font-size:13px;" onclick="window.updateLocalDocumentStatus('${req.id}', 'Completed')">Completed</div>
                 </div>
             </div>
         </td>
-    `
+    `;
     return tr;
 }
 
@@ -262,13 +376,46 @@ document.addEventListener('click', (e) => {
     }
 });
 
-window.updateLocalDocumentStatus = function(docId, newStatus, element) {
+window.updateLocalDocumentStatus = async function(docId, newStatus, element) {
     const targetItem = localRequestsCache.find(r => r.id === docId);
-    if (targetItem) {
-        targetItem.status = newStatus;
-    }
+    if (!targetItem) return;
+
+    const previousStatus = targetItem.status;
+    targetItem.status = newStatus;
     recalculateTabCounts();
     applyFiltersAndRenderTable();
+
+    const token = getAdminToken();
+    if (!token) {
+        alert('Admin authentication is required to save status changes. This update is local only.');
+        return;
+    }
+
+    if (String(docId).startsWith('req_')) {
+        // Local-only fallback; no backend ID available.
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/government/requests/${docId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + token,
+            },
+            body: JSON.stringify({ status: newStatus }),
+        });
+
+        if (!response.ok) {
+            throw new Error((await response.json()).error || response.statusText);
+        }
+    } catch (error) {
+        targetItem.status = previousStatus;
+        recalculateTabCounts();
+        applyFiltersAndRenderTable();
+        alert('Unable to save status update. Reverting locally.');
+        console.warn('Status update failed:', error);
+    }
 };
 
 function setupPaginationConfigs() {
@@ -370,6 +517,8 @@ function setupExportFeatures() {
 
 function setupTabFiltering() {
     const tabs = document.querySelectorAll('.doc-tab');
+    const filterLabelSpan = document.getElementById('current-filter-label');
+
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             tabs.forEach(t => t.classList.remove('active'));
@@ -377,17 +526,11 @@ function setupTabFiltering() {
             
             currentActiveFilter = tab.getAttribute('data-filter');
             currentPage = 1;
+            if (filterLabelSpan) {
+                filterLabelSpan.textContent = currentActiveFilter.charAt(0).toUpperCase() + currentActiveFilter.slice(1);
+            }
             applyFiltersAndRenderTable();
         });
     });
 }
 
-function setupLogoutRedirect() {
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.location.href = "../auth/index.html";
-        });
-    }
-}

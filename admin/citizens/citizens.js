@@ -40,13 +40,90 @@ let localCitizensCache = [
     }
 ];
 
+const API_BASE = 'http://localhost:5000/api';
+
+function getAdminToken() {
+    const storedAuth = JSON.parse(localStorage.getItem('barangay_admin_auth') || 'null');
+    return storedAuth?.idToken || null;
+}
+
+function getAdminUser() {
+    try {
+        return JSON.parse(localStorage.getItem('barangay_admin_user') || 'null') || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function checkAdminAuth() {
+    const adminAuth = localStorage.getItem('barangay_admin_auth');
+    const rememberActive = localStorage.getItem('barangay_admin_remembered') === 'true';
+    const isLoggedIn = sessionStorage.getItem('barangay_admin_logged_in') === 'true';
+    if (!adminAuth || (!isLoggedIn && !rememberActive)) {
+        window.location.href = '../auth/index.html';
+        return false;
+    }
+    if (!isLoggedIn && rememberActive) {
+        sessionStorage.setItem('barangay_admin_logged_in', 'true');
+    }
+    return true;
+}
+
+function populateAdminName(selector = 'auth-admin-name') {
+    const adminNameEl = document.getElementById(selector);
+    const adminUser = getAdminUser();
+    if (adminNameEl) {
+        adminNameEl.textContent = adminUser?.fullName || adminUser?.email || 'Admin User';
+    }
+}
+
+function setupLogoutButton() {
+    const logoutBtn = document.getElementById('logout-btn');
+    if (!logoutBtn) return;
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        sessionStorage.removeItem('barangay_admin_logged_in');
+        localStorage.removeItem('barangay_admin_remembered');
+        localStorage.removeItem('barangay_admin_auth');
+        localStorage.removeItem('barangay_admin_user');
+        window.location.href = '../auth/index.html';
+    });
+}
+
+function ensureAdminAuth() {
+    const token = getAdminToken();
+    if (!token) {
+        window.location.href = '../auth/index.html';
+        return null;
+    }
+    return token;
+}
+
+async function loadCitizensFromApi() {
+    const token = ensureAdminAuth();
+    if (!token) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/social/citizens`, {
+            headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!res.ok) throw new Error('Failed to load citizens');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+            localCitizensCache = data;
+        }
+    } catch (err) {
+        console.warn('Could not load citizens from API:', err);
+    }
+}
+
 // UI Configuration State
 let currentPage = 1;
 const itemsPerPage = 2; 
 let currentFilterStatus = "All"; 
 let isEditingDrawer = false; // Tracks whether the drawer is in read-only or edit mode
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Inject mobile responsive style overrides
     const responsiveStyleOverride = document.createElement('style');
     responsiveStyleOverride.innerHTML = `
@@ -79,15 +156,15 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.head.appendChild(responsiveStyleOverride);
 
+    if (!checkAdminAuth()) return;
+    populateAdminName();
     setupMobileMenuToggle();
     setupFilterCycle();
     setupSearchFilters();
     setupDrawerInteractions();
-    setupLogoutAction();
-    
-    const adminNameEl = document.getElementById('auth-admin-name');
-    if (adminNameEl) adminNameEl.textContent = "Admin User";
-    
+    setupLogoutButton();
+
+    await loadCitizensFromApi();
     updateMetricsDashboardCards();
     applyFilterAndRenderTable();
 });
@@ -299,6 +376,26 @@ window.toggleCitizenStatus = function(docId) {
     
     updateMetricsDashboardCards();
     applyFilterAndRenderTable();
+
+    // Persist status change to backend when possible
+    const token = getAdminToken();
+    if (!token) return; // keep local fallback
+
+    // If id looks like a backend uid (not our local placeholder), attempt to PATCH
+    if (!String(docId).startsWith('doc_') && !String(docId).startsWith('SC-')) {
+        fetch(`${API_BASE}/social/citizens/${docId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + token,
+            },
+            body: JSON.stringify({ status: citizen.status }),
+        }).then((res) => {
+            if (!res.ok) {
+                console.warn('Failed to persist citizen status change');
+            }
+        }).catch((err) => console.warn('Citizen status persist error', err));
+    }
 };
 
 function updateMetricsDashboardCards() {
@@ -585,15 +682,5 @@ function setupDrawerInteractions() {
                 updateMetricsDashboardCards();
             });
         }
-    }
-}
-// LOGOUT SYSTEM INTERACTION ACTION
-function setupLogoutAction() {
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.location.href = "../auth/index.html";
-        });
     }
 }

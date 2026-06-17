@@ -56,16 +56,115 @@ const itemsPerPage = 10;
 let currentDropdownModuleFilter = "all";
 let globalSearchQueryText = "";
 
+const API_BASE = 'http://localhost:5000/api';
+
+function getAdminToken() {
+  const storedAuth = JSON.parse(localStorage.getItem('barangay_admin_auth') || 'null');
+  return storedAuth?.idToken || null;
+}
+
+function ensureAdminAuth() {
+  const token = getAdminToken();
+  if (!token) {
+    window.location.href = '../auth/index.html';
+    return null;
+  }
+  return token;
+}
+
+function getAdminUser() {
+  try {
+    return JSON.parse(localStorage.getItem('barangay_admin_user') || 'null') || null;
+  } catch (error) {
+    console.warn('Failed to parse stored admin user', error);
+    return null;
+  }
+}
+
+function checkAdminAuth() {
+  const adminAuth = localStorage.getItem('barangay_admin_auth');
+  const rememberActive = localStorage.getItem('barangay_admin_remembered') === 'true';
+  const isLoggedIn = sessionStorage.getItem('barangay_admin_logged_in') === 'true';
+
+  if (!adminAuth || (!isLoggedIn && !rememberActive)) {
+    window.location.href = '../auth/index.html';
+    return false;
+  }
+
+  if (!isLoggedIn && rememberActive) {
+    sessionStorage.setItem('barangay_admin_logged_in', 'true');
+  }
+
+  return true;
+}
+
+function populateAdminName(selector = 'auth-admin-name') {
+  const adminNameEl = document.getElementById(selector);
+  const adminUser = getAdminUser();
+  if (adminNameEl) {
+    adminNameEl.textContent = adminUser?.fullName || adminUser?.email || 'Admin User';
+  }
+}
+
+async function loadAuditLogsFromApi() {
+  const token = ensureAdminAuth();
+  if (!token) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/social/audit-logs`, {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (!res.ok) throw new Error('Failed to load audit logs');
+    const data = await res.json();
+    if (Array.isArray(data)) mockAuditLogsCache = data.map(d => ({
+      time: d.createdAt || d.timestamp || d.time || '',
+      admin: d.actorEmail || d.admin || d.actor || 'System',
+      action: d.action || d.type || 'Action',
+      module: d.module || 'General',
+      modClass: d.modClass || 'mod-users',
+      details: JSON.stringify(d.meta || d.details || {}).slice(0, 200),
+    }));
+  } catch (err) {
+    console.warn('Could not load audit logs from API:', err);
+  }
+}
+
+async function loadDashboardMetricsFromApi() {
+  const token = getAdminToken();
+  if (!token) return;
+  try {
+    const res = await fetch(`${API_BASE}/social/dashboard`, {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.metrics) {
+      mockAnalyticsMetrics.totalSeniors = data.metrics.totalRegistered || mockAnalyticsMetrics.totalSeniors;
+      mockAnalyticsMetrics.activeMobiles = data.metrics.activeAlerts || mockAnalyticsMetrics.activeMobiles;
+      mockAnalyticsMetrics.verifiedAccounts = data.metrics.totalRegistered ? Math.max(0, data.metrics.totalRegistered - 94) : mockAnalyticsMetrics.verifiedAccounts;
+    }
+  } catch (err) {
+    console.warn('Could not load dashboard metrics', err);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-  setupMobileMenuToggle();
-  setupDropdownAndSearchFilters();
-  setupExportCSVReportFeature();
-  setupManualLogFABEntry();
-  setupLogoutRedirection();
-  
-  renderKPIMetricsCards();
-  renderAnalyticsBarChart();
-  applyFiltersAndRenderAuditTable();
+  (async () => {
+    if (!checkAdminAuth()) return;
+    setupMobileMenuToggle();
+    setupDropdownAndSearchFilters();
+    setupExportCSVReportFeature();
+    setupManualLogFABEntry();
+    setupLogoutButton();
+    populateAdminName();
+
+    await loadAuditLogsFromApi();
+    await loadDashboardMetricsFromApi();
+
+    renderKPIMetricsCards();
+    renderAnalyticsBarChart();
+    applyFiltersAndRenderAuditTable();
+  })();
 });
 
 // FIXED BURGER BUTTON LOGIC
@@ -313,12 +412,15 @@ function setupManualLogFABEntry() {
   });
 }
 
-function setupLogoutRedirection() {
+function setupLogoutButton() {
   const logoutBtn = document.getElementById("logout-btn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      window.location.href = "../auth/index.html";
-    });
-  }
+  if (!logoutBtn) return;
+  logoutBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    sessionStorage.removeItem('barangay_admin_logged_in');
+    localStorage.removeItem('barangay_admin_remembered');
+    localStorage.removeItem('barangay_admin_auth');
+    localStorage.removeItem('barangay_admin_user');
+    window.location.href = "../auth/index.html";
+  });
 }

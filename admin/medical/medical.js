@@ -1,3 +1,5 @@
+const API_BASE = 'http://localhost:5000/api';
+
 // FOR DEMO PURPOSES
 let mockAppointmentsData = [
     { id: "apt_1", date: "2026-06-05", time: "09:30 AM", patient: "JUAN DELA CRUZ", doctor: "Dr. Maria Santos", purpose: "Hypertension Routine Follow-up" },
@@ -8,6 +10,7 @@ let mockAppointmentsData = [
 
 // UPDATED: Added contact, hours, and isActive flags
 let mockProvidersDirectory = [
+
     { id: "prov_1", name: "Dr. Maria Santos", type: "Primary Care", location: "Purok 2 Health Center Annex", contact: "0917-111-2222", hours: "8:00 AM - 5:00 PM", isActive: true, status: "Active" },
     { id: "prov_2", name: "Dr. Alan Diaz", type: "Dental", location: "Barangay Central Dental Clinic", contact: "0918-333-4444", hours: "9:00 AM - 4:00 PM", isActive: true, status: "Active" },
     { id: "prov_3", name: "Dr. Elena Abad", type: "Optical", location: "Purok 4 Eyecare Station", contact: "0922-555-6666", hours: "10:00 AM - 3:00 PM", isActive: false, status: "Inactive" },
@@ -21,27 +24,111 @@ const directoryItemsPerPage = 6;
 let targetedProviderTypeFilter = "All Types";
 let targetedProviderStatusFilter = "All Statuses"; 
 
-document.addEventListener('DOMContentLoaded', () => {
+function getAdminToken() {
+    const storedAuth = JSON.parse(localStorage.getItem('barangay_admin_auth') || 'null');
+    return storedAuth && storedAuth.idToken ? storedAuth.idToken : null;
+}
+
+function getAdminUser() {
+    try {
+        return JSON.parse(localStorage.getItem('barangay_admin_user') || 'null') || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function checkAdminAuth() {
+    const adminAuth = localStorage.getItem('barangay_admin_auth');
+    const rememberActive = localStorage.getItem('barangay_admin_remembered') === 'true';
+    const isLoggedIn = sessionStorage.getItem('barangay_admin_logged_in') === 'true';
+    if (!adminAuth || (!isLoggedIn && !rememberActive)) {
+        window.location.href = '../auth/index.html';
+        return false;
+    }
+    if (!isLoggedIn && rememberActive) {
+        sessionStorage.setItem('barangay_admin_logged_in', 'true');
+    }
+    return true;
+}
+
+function populateAdminName(selector = 'auth-admin-name') {
+    const adminNameEl = document.getElementById(selector);
+    const adminUser = getAdminUser();
+    if (adminNameEl) {
+        adminNameEl.textContent = adminUser?.fullName || adminUser?.email || 'Admin User';
+    }
+}
+
+function setupLogoutButton() {
+    const logoutBtn = document.getElementById('logout-btn');
+    if (!logoutBtn) return;
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        sessionStorage.removeItem('barangay_admin_logged_in');
+        localStorage.removeItem('barangay_admin_remembered');
+        localStorage.removeItem('barangay_admin_auth');
+        localStorage.removeItem('barangay_admin_user');
+        window.location.href = '../auth/index.html';
+    });
+}
+
+function ensureAdminAuth() {
+    const token = getAdminToken();
+    if (!token) {
+        window.location.href = '../auth/index.html';
+        return null;
+    }
+    return token;
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!checkAdminAuth()) return;
     setupMobileMenuToggle();
     setupTabSwitchingLogic();
     initializeCalendarEngine();
     setupProviderDirectoryLogic();
     setupModalFormActionLayer();
     setupRoutingRedirects();
+    setupLogoutButton();
 
-    // Default view setup configurations
-    const adminNameEl = document.getElementById('auth-admin-name');
-    if (adminNameEl) adminNameEl.textContent = "Admin User";
+    populateAdminName();
     
     const year = currentCalendarDate.getFullYear();
     const month = String(currentCalendarDate.getMonth() + 1).padStart(2, '0');
     const day = String(currentCalendarDate.getDate()).padStart(2, '0');
     selectedCalendarDayString = `${year}-${month}-${day}`;
     
+    await loadAppointmentsFromApi();
     renderCalendarGridCanvas();
     renderFilteredAppointmentsList();
     renderProviderDirectoryGrid();
 });
+
+async function loadAppointmentsFromApi() {
+    const token = ensureAdminAuth();
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/medical/appointments`, {
+            headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!response.ok) throw new Error('Unable to fetch appointment data');
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+            mockAppointmentsData = data.map(item => ({
+                id: item.id || `apt_${Date.now()}`,
+                date: item.date || '',
+                time: item.time || '',
+                patient: item.fullName || item.patient || 'Untitled',
+                doctor: item.doctorName || item.doctor || 'Unknown',
+                purpose: item.medicalAttention || item.purpose || 'Medical request',
+            }));
+        }
+    } catch (error) {
+        console.warn('Loading appointments from API failed:', error);
+    }
+}
+
 
 function setupMobileMenuToggle() {
     const burgerBtn = document.getElementById('menu-toggle');
@@ -472,12 +559,6 @@ function setupRoutingRedirects() {
     if (viewAllAptsBtn) {
         viewAllAptsBtn.addEventListener('click', () => {
             window.location.href = "../social_wellness/index.html";
-        });
-    }
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.location.href = "../auth/index.html";
         });
     }
 }

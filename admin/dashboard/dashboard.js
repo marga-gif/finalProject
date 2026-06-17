@@ -27,9 +27,64 @@ const mockDashboardData = {
     ]
 };
 
+const API_BASE = 'http://localhost:5000/api';
+
 // ==========================================
 // AUTHENTICATION CHECK
 // ==========================================
+function getAdminToken() {
+    const storedAuth = JSON.parse(localStorage.getItem('barangay_admin_auth') || 'null');
+    return storedAuth?.idToken || null;
+}
+
+async function loadDashboardData() {
+    const token = getAdminToken();
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/social/dashboard`, {
+            headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!response.ok) {
+            throw new Error('Unable to load dashboard data');
+        }
+        const data = await response.json();
+
+        if (data.metrics) {
+            mockDashboardData.metrics.totalRegistered = String(data.metrics.totalRegistered || '0');
+            mockDashboardData.metrics.pendingDocs = String(data.metrics.pendingDocs || '0');
+            mockDashboardData.metrics.eventRsvps = String(data.metrics.eventRsvps || '0');
+            mockDashboardData.metrics.activeAlerts = String(data.metrics.activeAlerts || '0');
+        }
+
+        if (Array.isArray(data.recentActivity) && data.recentActivity.length > 0) {
+            mockDashboardData.activities = data.recentActivity.map((log) => ({
+                icon: 'fa-bullhorn',
+                color: '#047857',
+                text: `${log.action?.replace(/_/g, ' ') || 'Activity'}${log.actorEmail ? ' by ' + log.actorEmail : ''}`,
+                time: log.timestamp ? new Date(log.timestamp).toLocaleString() : 'Just now',
+            }));
+        }
+
+        if (Array.isArray(data.upcomingAppointments) && data.upcomingAppointments.length > 0) {
+            mockDashboardData.appointments = data.upcomingAppointments.map((appt) => ({
+                title: appt.fullName || appt.patient || appt.medicalAttention || 'Appointment',
+                scope: `${appt.date || ''} ${appt.time || ''}`.trim(),
+                status: appt.status || 'Scheduled',
+            }));
+        }
+
+        setupDashboardInteractions();
+        setupDropdownModules();
+        setupRoutingActions();
+    } catch (error) {
+        console.warn('Dashboard API load failed:', error);
+        setupDashboardInteractions();
+        setupDropdownModules();
+        setupRoutingActions();
+    }
+}
+
 function checkAdminAuth() {
     const adminAuth = localStorage.getItem('barangay_admin_auth');
     const adminUser = localStorage.getItem('barangay_admin_user');
@@ -58,7 +113,7 @@ function checkAdminAuth() {
 }
 
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Check admin authentication first
     checkAdminAuth();
 
@@ -98,9 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.head.appendChild(styleOverride);
 
     setupMobileNavigation();
-    setupDashboardInteractions();
-    setupDropdownModules();
-    setupRoutingActions();
+    await loadDashboardData();
     setupLogout();
 });
 
@@ -110,6 +163,8 @@ function setupLogout() {
         logoutBtn.addEventListener('click', () => {
             sessionStorage.removeItem('barangay_admin_logged_in');
             localStorage.removeItem('barangay_admin_remembered');
+            localStorage.removeItem('barangay_admin_auth');
+            localStorage.removeItem('barangay_admin_user');
             window.location.href = '../auth/index.html';
         });
     }

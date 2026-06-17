@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const backBtn = document.querySelector('.btn-back-to-user-login');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
+            // Navigate back to the user-facing login page.
+            // Use a relative path from /admin/auth/index.html to /html/login.html
             window.location.href = '../../html/login.html';
         });
     }
@@ -58,12 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (inputField.type === 'password') {
                 inputField.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash'); // Switch to slashed eye
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye'); // Switch to slashed eye
             } else {
                 inputField.type = 'password';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye'); // Switch back to normal eye
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash'); // Switch back to normal eye
             }
         });
     });
@@ -154,16 +156,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- REGISTRATION LOGIC ---
     if (registerForm) {
-        registerForm.addEventListener('submit', (event) => {
+        registerForm.addEventListener('submit', async (event) => {
             event.preventDefault();
 
             const fname = document.getElementById('reg-firstname').value.trim();
+            const mname = document.getElementById('reg-middlename').value.trim();
             const lname = document.getElementById('reg-lastname').value.trim();
             const email = document.getElementById('reg-email').value.trim();
             const password = document.getElementById('reg-password').value;
+            const passwordConfirm = document.getElementById('reg-password-confirm').value;
+            const adminToken = document.getElementById('reg-admin-token').value.trim();
 
             // Validation
-            if (!fname || !lname || !email || !password) {
+            if (!fname || !lname || !email || !password || !passwordConfirm || !adminToken) {
                 showToast("Please fill out all required fields.", "warning");
                 return;
             }
@@ -171,12 +176,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast("Names must not contain numbers or special characters.", "error");
                 return;
             }
+            if (mname && !nameRegex.test(mname)) {
+                showToast("Middle name must not contain numbers or special characters.", "error");
+                return;
+            }
             if (!emailRegex.test(email)) {
                 showToast("Please enter a valid email address format.", "error");
                 return;
             }
-            if (password.length < 8) {
-                showToast("Password must be at least 8 characters long.", "warning");
+            if (password.length < 6) {
+                showToast("Password must be at least 6 characters long.", "warning");
+                return;
+            }
+            if (password !== passwordConfirm) {
+                showToast("Passwords do not match. Please try again.", "error");
                 return;
             }
 
@@ -185,15 +198,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
                 registerBtn.disabled = true;
 
-                setTimeout(() => {
-                    showToast("Registration successful! Please log in.", "success");
-                    
-                    registerBtn.innerHTML = originalText;
-                    registerBtn.disabled = false;
+                try {
+                    const response = await fetch('http://localhost:5000/api/auth/register/admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            firstName: fname,
+                            middleName: mname || undefined,
+                            lastName: lname,
+                            email,
+                            password,
+                            adminToken
+                        }),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Registration failed.');
+                    }
+
+                    showToast("Registration successful! Redirecting to login...", "success");
                     registerForm.reset();
                     
-                    toggleAuthMode('login'); 
-                }, 1000);
+                    setTimeout(() => {
+                        toggleAuthMode('login'); 
+                    }, 1000);
+                } catch (error) {
+                    showToast(error.message || 'Registration failed. Please try again.', "error");
+                } finally {
+                    registerBtn.innerHTML = originalText;
+                    registerBtn.disabled = false;
+                }
             }
         });
     }

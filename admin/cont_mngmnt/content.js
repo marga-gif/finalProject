@@ -11,12 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.head.appendChild(responsiveStyleOverride);
 
+    if (!checkAdminAuth()) return;
     setupMobileMenuToggle();
     setupAccordion();
     setupLivePreviewAndCounters();
     setupDateInjection();
     setupInteractiveActions();
-    setupLogoutAction();
+    populateAdminName();
+    setupLogoutButton();
 });
 
 // ==========================================
@@ -235,12 +237,50 @@ function setupDateInjection() {
     }
 }
 
-function setupLogoutAction() {
+function setupLogoutButton() {
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            sessionStorage.removeItem('barangay_admin_logged_in');
+            localStorage.removeItem('barangay_admin_remembered');
+            localStorage.removeItem('barangay_admin_auth');
+            localStorage.removeItem('barangay_admin_user');
             window.location.href = "../auth/index.html";
         });
+    }
+}
+
+function getAdminUser() {
+    try {
+        return JSON.parse(localStorage.getItem('barangay_admin_user') || 'null') || null;
+    } catch (error) {
+        console.warn('Failed to parse stored admin user', error);
+        return null;
+    }
+}
+
+function checkAdminAuth() {
+    const adminAuth = localStorage.getItem('barangay_admin_auth');
+    const rememberActive = localStorage.getItem('barangay_admin_remembered') === 'true';
+    const isLoggedIn = sessionStorage.getItem('barangay_admin_logged_in') === 'true';
+
+    if (!adminAuth || (!isLoggedIn && !rememberActive)) {
+        window.location.href = '../auth/index.html';
+        return false;
+    }
+
+    if (!isLoggedIn && rememberActive) {
+        sessionStorage.setItem('barangay_admin_logged_in', 'true');
+    }
+
+    return true;
+}
+
+function populateAdminName(selector = 'auth-admin-name') {
+    const adminNameEl = document.getElementById(selector);
+    const adminUser = getAdminUser();
+    if (adminNameEl) {
+        adminNameEl.textContent = adminUser?.fullName || adminUser?.email || 'Admin User';
     }
 }

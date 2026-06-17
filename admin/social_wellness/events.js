@@ -1,9 +1,14 @@
 // 1. DATA CACHE CORES (Restored so the Publish Button has somewhere to save data)
+const API_BASE = 'http://localhost:5000/api';
+
 let localEventsCache = [
     { id: "evt_001", title: "Quarterly Health & Wellness Checkup", scheduleDate: "2026-06-20", timeScope: "08:00 AM", location: "Barangay San Jose Gym", totalRsvps: 38, targetSlots: 100, status: "Upcoming", typeTag: "Medical Assistance" },
     { id: "evt_002", title: "Senior Citizens General Assembly Meeting", scheduleDate: "2026-06-28", timeScope: "01:30 PM", location: "Community Multi-Purpose Hall", totalRsvps: 89, targetSlots: 150, status: "Ongoing", typeTag: "Meeting" },
     { id: "evt_003", title: "Barangay Free Physical Therapy Session", scheduleDate: "2026-05-15", timeScope: "09:00 AM", location: "Health Center Hub", totalRsvps: 50, targetSlots: 50, status: "Completed", typeTag: "Wellness" }
 ];
+let eventRegistrations = [];
+let registrationsLoaded = false;
+let registrationsFetchError = null;
 
 let mockAttendeesProfileDatabase = {
     "evt_001": [
@@ -29,19 +34,213 @@ let currentSortOrderDirection = "Newest";
 let currentlyInspectedEventId = null;
 let activeAttendanceSubTab = "all"; 
 
-document.addEventListener('DOMContentLoaded', () => {
+function getAdminToken() {
+    const storedAuth = JSON.parse(localStorage.getItem('barangay_admin_auth') || 'null');
+    return storedAuth && storedAuth.idToken ? storedAuth.idToken : null;
+}
+
+function getAdminUser() {
+    try {
+        return JSON.parse(localStorage.getItem('barangay_admin_user') || 'null') || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function checkAdminAuth() {
+    const adminAuth = localStorage.getItem('barangay_admin_auth');
+    const rememberActive = localStorage.getItem('barangay_admin_remembered') === 'true';
+    const isLoggedIn = sessionStorage.getItem('barangay_admin_logged_in') === 'true';
+    if (!adminAuth || (!isLoggedIn && !rememberActive)) {
+        window.location.href = '../auth/index.html';
+        return false;
+    }
+    if (!isLoggedIn && rememberActive) {
+        sessionStorage.setItem('barangay_admin_logged_in', 'true');
+    }
+    return true;
+}
+
+function populateAdminName(selector = 'auth-admin-name') {
+    const adminNameEl = document.getElementById(selector);
+    const adminUser = getAdminUser();
+    if (adminNameEl) {
+        adminNameEl.textContent = adminUser?.fullName || adminUser?.email || 'Admin User';
+    }
+}
+
+function setupLogoutButton() {
+    const logoutBtn = document.getElementById('logout-btn');
+    if (!logoutBtn) return;
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        sessionStorage.removeItem('barangay_admin_logged_in');
+        localStorage.removeItem('barangay_admin_remembered');
+        localStorage.removeItem('barangay_admin_auth');
+        localStorage.removeItem('barangay_admin_user');
+        window.location.href = '../auth/index.html';
+    });
+}
+
+function ensureAdminAuth() {
+    const token = getAdminToken();
+    if (!token) {
+        window.location.href = '../auth/index.html';
+        return null;
+    }
+    return token;
+}
+
+function mapBackendEventToLocal(event) {
+    return {
+        id: event.id || `evt_${Date.now()}`,
+        title: event.title || 'Untitled Event',
+        scheduleDate: event.date || event.scheduleDate || '',
+        timeScope: event.time || event.timeScope || '',
+        location: event.location || 'TBD',
+        totalRsvps: event.totalRsvps || 0,
+        targetSlots: event.capacity || event.targetSlots || 0,
+        status: event.status || determineStatusFromDate(event.date || event.scheduleDate || ''),
+        typeTag: event.typeTag || (event.title && event.title.toLowerCase().includes('meeting') ? 'Meeting' : 'Wellness'),
+    };
+}
+
+function determineStatusFromDate(dateStr) {
+    if (!dateStr) return 'Upcoming';
+    try {
+        const today = new Date();
+        const ymd = dateStr.split('T')[0];
+        const parts = ymd.split('-');
+        if (parts.length !== 3) return 'Upcoming';
+        const [y, m, d] = parts.map(Number);
+        const evDate = new Date(y, m - 1, d);
+        // Compare only the date portion
+        const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const e0 = new Date(evDate.getFullYear(), evDate.getMonth(), evDate.getDate()).getTime();
+        if (e0 > t0) return 'Upcoming';
+        if (e0 < t0) return 'Completed';
+        return 'Ongoing';
+    } catch (err) {
+        return 'Upcoming';
+    }
+}
+
+async function loadEventRegistrationsFromApi() {
+    const token = getAdminToken();
+    registrationsFetchError = null;
+    registrationsLoaded = false;
+    eventRegistrations = [];
+
+    if (!token) {
+        registrationsFetchError = 'Admin authentication token is missing.';
+        registrationsLoaded = true;
+        return;
+    }
+
+    try {
+        console.log('[admin social] fetching event registrations, token present:', !!token);
+        const response = await fetch(`${API_BASE}/social/registrations`, {
+            headers: {
+                Authorization: 'Bearer ' + token,
+            },
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to load registrations (${response.status}): ${errorText}`);
+        }
+
+        const data = await response.json();
+        const payload = Array.isArray(data) ? data : [];
+
+        eventRegistrations = payload.map(reg => ({
+            id: reg.id || null,
+            eventId: reg.eventId,
+            eventTitle: reg.eventTitle || '',
+            userId: reg.userId,
+            participantName: reg.participantName || 'Unknown Attendee',
+            participantEmail: reg.participantEmail || '',
+            status: reg.status || 'Registered',
+            createdAt: reg.createdAt || '',
+        }));
+
+        // Update mock attendees database from registrations
+        eventRegistrations.forEach(reg => {
+            if (!mockAttendeesProfileDatabase[reg.eventId]) {
+                mockAttendeesProfileDatabase[reg.eventId] = [];
+            }
+            const alreadyExists = mockAttendeesProfileDatabase[reg.eventId].find(a => a.id === reg.userId);
+            if (!alreadyExists) {
+                mockAttendeesProfileDatabase[reg.eventId].push({
+                    id: reg.userId,
+                    name: reg.participantName,
+                    checkedIn: false,
+                });
+            }
+        });
+
+        // Update event RSVP counts from registrations
+        localEventsCache.forEach(evt => {
+            const count = eventRegistrations.filter(r => r.eventId === evt.id).length;
+            if (count > 0) {
+                evt.totalRsvps = count;
+            }
+        });
+
+        console.log(`[admin social] loaded ${eventRegistrations.length} registrations`, eventRegistrations);
+    } catch (error) {
+        console.warn('Could not load event registrations from API:', error);
+        registrationsFetchError = error.message || 'Unable to load event registrations.';
+        eventRegistrations = [];
+    } finally {
+        registrationsLoaded = true;
+    }
+}
+
+async function loadEventsFromApi() {
+    const token = ensureAdminAuth();
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/social/events`, {
+            headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!response.ok) throw new Error('Unable to load events');
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+            localEventsCache = data.map(mapBackendEventToLocal).map(ev => ({
+                ...ev,
+                status: determineStatusFromDate(ev.scheduleDate),
+            }));
+        }
+    } catch (error) {
+        console.warn('Failed to load social events from API:', error);
+    }
+    // Load registrations after events
+    await loadEventRegistrationsFromApi();
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!checkAdminAuth()) return;
+    console.log('[admin social] admin token present at DOMContentLoaded:', !!getAdminToken());
     setupMobileMenuBurger();
     setupTabPillFiltering();
     setupAdvancedControlsAndSorting();
     setupModalFormActionLayer();
     setupAttendancePanelMechanics();
-    setupLogoutRedirectAction();
+    setupLogoutButton();
+
+    populateAdminName();
     
-    const adminNameEl = document.getElementById('auth-admin-name');
-    if (adminNameEl) adminNameEl.textContent = "Admin User";
-    
+    await loadEventsFromApi();
     recalculateStatusPillTabCounts();
     applyFiltersAndRenderEventGridCanvas();
+
+    // Poll for registration updates every 30 seconds to sync attendees from Firestore
+    setInterval(async () => {
+        await loadEventRegistrationsFromApi();
+        applyFiltersAndRenderEventGridCanvas();
+    }, 30000);
 });
 
 function setupMobileMenuBurger() {
@@ -64,9 +263,10 @@ function setupMobileMenuBurger() {
 
 function recalculateStatusPillTabCounts() {
     const metrics = { all: localEventsCache.length, upcoming: 0, ongoing: 0, completed: 0 };
-    
+
     localEventsCache.forEach(e => {
-        const stat = String(e.status).toLowerCase();
+        const computed = determineStatusFromDate(e.scheduleDate || '');
+        const stat = String(computed).toLowerCase();
         if (stat === "upcoming") metrics.upcoming++;
         else if (stat === "ongoing") metrics.ongoing++;
         else if (stat === "completed") metrics.completed++;
@@ -132,10 +332,13 @@ function applyFiltersAndRenderEventGridCanvas() {
 
     const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
     let processedCards = localEventsCache.filter(evt => {
-        const matchesStatus = (selectedStatusPillTab === "all" || evt.status.toLowerCase() === selectedStatusPillTab);
+        const computedStatus = determineStatusFromDate(evt.scheduleDate || '');
+        const matchesStatus = (selectedStatusPillTab === "all" || String(computedStatus).toLowerCase() === selectedStatusPillTab);
         const matchesCategory = (chosenActivityTypeFilter === "All" || evt.typeTag === chosenActivityTypeFilter);
         const matchesSearchText = !query || evt.title.toLowerCase().includes(query) || evt.location.toLowerCase().includes(query);
 
+        // attach computedStatus for rendering convenience
+        evt._computedStatus = computedStatus;
         return matchesStatus && matchesCategory && matchesSearchText;
     });
 
@@ -161,7 +364,8 @@ function applyFiltersAndRenderEventGridCanvas() {
         const parsedDate = new Date(evt.scheduleDate);
         const prettyDate = isNaN(parsedDate) ? evt.scheduleDate : parsedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
         
-        let statusBadgeClass = evt.status.toLowerCase() === 'upcoming' ? 'upcoming' : (evt.status.toLowerCase() === 'ongoing' ? 'ongoing' : 'completed');
+        const statusToShow = evt._computedStatus || determineStatusFromDate(evt.scheduleDate || '');
+        let statusBadgeClass = String(statusToShow).toLowerCase() === 'upcoming' ? 'upcoming' : (String(statusToShow).toLowerCase() === 'ongoing' ? 'ongoing' : 'completed');
         let completionPercent = Math.min(100, Math.round((evt.totalRsvps / (evt.targetSlots || 100)) * 100));
 
         const cardHTML = `
@@ -170,7 +374,7 @@ function applyFiltersAndRenderEventGridCanvas() {
                     <div style="width:100%; height:100%; background:linear-gradient(135deg, var(--primary-dark) 0%, #1e293b 100%); display:flex; align-items:center; justify-content:center; color:white; font-size:24px;">
                         <i class="${evt.typeTag === 'Medical Assistance' ? 'fas fa-notes-Medical Assistance' : (evt.typeTag === 'Meeting' ? 'fas fa-users' : 'fas fa-heartbeat')}"></i>
                     </div>
-                    <span class="event-status-badge ${statusBadgeClass}">${evt.status}</span>
+                    <span class="event-status-badge ${statusBadgeClass}">${statusToShow}</span>
                 </div>
                 <div class="event-content">
                     <h3 class="event-title">${evt.title}</h3>
@@ -251,7 +455,7 @@ function setupModalFormActionLayer() {
     if (cancelBtn) cancelBtn.addEventListener('click', hideAndResetModalClosure);
 
     if (saveBtn) {
-        saveBtn.addEventListener('click', (e) => {
+        saveBtn.addEventListener('click', async (e) => {
             e.preventDefault();
 
             const titleInput = document.getElementById('modal-event-title');
@@ -321,8 +525,7 @@ function setupModalFormActionLayer() {
             }
 
             // --- STATUS & TYPE CALCULATION ---
-            let statusFlag = "Upcoming";
-            if (date === systemCurrentDateStr) statusFlag = "Ongoing";
+            let statusFlag = determineStatusFromDate(date);
 
             let typeTag = "Wellness";
             if (title.toLowerCase().includes("med") || title.toLowerCase().includes("health") || title.toLowerCase().includes("clinic")) typeTag = "Medical Assistance";
@@ -341,6 +544,40 @@ function setupModalFormActionLayer() {
             };
 
             mockAttendeesProfileDatabase[newGeneratedEventObj.id] = [];
+
+            const token = getAdminToken();
+            if (token) {
+                try {
+                    const response = await fetch(`${API_BASE}/social/events`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token,
+                        },
+                        body: JSON.stringify({
+                            title,
+                            date,
+                            time: time,
+                            location: loc,
+                            capacity: slots,
+                            description: `${typeTag} event created by admin`,
+                        }),
+                    });
+
+                    if (response.ok) {
+                        const created = await response.json();
+                        newGeneratedEventObj.id = created.id || newGeneratedEventObj.id;
+                        newGeneratedEventObj.scheduleDate = created.date || newGeneratedEventObj.scheduleDate;
+                        newGeneratedEventObj.timeScope = created.time || newGeneratedEventObj.timeScope;
+                        newGeneratedEventObj.targetSlots = created.capacity || newGeneratedEventObj.targetSlots;
+                    } else {
+                        console.warn('Create event API failed:', await response.text());
+                    }
+                } catch (error) {
+                    console.warn('Social event create request failed:', error);
+                }
+            }
+
             localEventsCache.unshift(newGeneratedEventObj); 
             
             recalculateStatusPillTabCounts();
@@ -488,12 +725,15 @@ window.triggerSingleAttendeeCheckIn = function(attendeeId) {
     }
 };
 
-function setupLogoutRedirectAction() {
+function setupLogoutButton() {
     const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.location.href = "../auth/index.html";
-        });
-    }
+    if (!logoutBtn) return;
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        sessionStorage.removeItem('barangay_admin_logged_in');
+        localStorage.removeItem('barangay_admin_remembered');
+        localStorage.removeItem('barangay_admin_auth');
+        localStorage.removeItem('barangay_admin_user');
+        window.location.href = '../auth/index.html';
+    });
 }

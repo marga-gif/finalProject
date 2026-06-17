@@ -44,22 +44,15 @@
     min-height: 600px;
 }
 
-/* --- Left Side Branding Artwork Panel --- */
 .auth-brand {
     background-color: var(--auth-primary-dark);
     color: #FFFFFF;
-    width: 45%;
-    padding: 50px 45px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
-    position: relative;
     width: 45%;
     padding: 50px 40px;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    align-items: flex-start;
     position: relative;
     overflow: hidden;
 }
@@ -85,28 +78,6 @@
     justify-content: center;
 }
 
-/* Translucent floating square card around your logo icon 
-.logo-glass-frame {
-    opacity: 0;
-    width: 60px;
-    height: 60px;
-    background: rgba(255, 255, 255, 0.253);
-    border: 1px solid rgba(114, 114, 114, 0.164);
-    backdrop-filter: blur(10px);
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 24px;
-}
-
-.logo-glass-frame img {
-    width: 75%;
-    height: 85%;
-    object-fit: contain;
-    opacity: 100%;
-}*/
-
 .auth-brand h2 {
     font-size: 25px;
     font-weight: 700;
@@ -123,7 +94,6 @@
     line-height: 1.4;
 }
 
-/* Clean divider line from the reference screenshots */
 .brand-divider-line {
     width: 100%;
     height: 1px;
@@ -138,7 +108,6 @@
     font-weight: 700;
 }
 
-/* --- Right Side Input Form Area Context --- */
 .auth-forms {
     width: 55%;
     padding: 50px 45px;
@@ -208,7 +177,6 @@
     font-weight: 500;
 }
 
-/* --- Row Inputs Blocks Layout --- */
 .input-group {
     margin-bottom: 16px;
     display: flex;
@@ -261,7 +229,6 @@
     font-weight: 400;
 }
 
-/* --- Action Checkboxes Links --- */
 .form-actions-row {
     display: flex;
     justify-content: space-between;
@@ -346,59 +313,89 @@
 
 .w-100 { width: 100%; }
 
-/* --- Mobile Responsive Layout Stacking Breakpoints --- */
-@media screen and (max-width: 840px) {
-    .auth-card {
-        flex-direction: column;
-        min-height: auto;
-    }
-    .auth-brand {
-        width: 100%;
-        padding: 40px 30px;
-        text-align: center;
-        align-items: center;
-    }
-    .logo-glass-frame {
-        margin-inline: auto;
-    }
-    .brand-divider-line {
-        margin-top: 25px;
-        margin-bottom: 15px;
-    }
-    .auth-forms {
-        width: 100%;
-        padding: 35px;
-    }
-}
-/* --- Custom Interactive Modals --- */
 .modal-overlay {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(10, 25, 47, 0.5); backdrop-filter: blur(3px); z-index: 998;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 25, 47, 0.35); 
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 998;
 }
 
 .custom-modal {
-    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    background: var(--auth-bg-panel); width: 90%; max-width: 420px;
-    border-radius: var(--auth-radius-card); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
-    z-index: 999; display: flex; flex-direction: column;
-    animation: modalFadeIn 0.2s ease-out forwards;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--auth-bg-panel);
+    width: 90%;
+    max-width: 460px;
+    border-radius: var(--auth-radius-card);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modalFadeIn 0.25s ease-out forwards;
 }
 
 @keyframes modalFadeIn {
-    from { opacity: 0; transform: translate(-50%, -45%); }
+    from { opacity: 0; transform: translate(-50%, -46%); }
     to { opacity: 1; transform: translate(-50%, -50%); }
 }
 
 .modal-header {
-    padding: 18px 20px; border-bottom: 1px solid var(--auth-border-color);
-    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--auth-border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.btn-close-modal { background: none; border: none; color: #9CA3AF; cursor: pointer; font-size: 18px; transition: var(--auth-smooth); }
-.btn-close-modal:hover { color: #1F2937; }
-#cancel-recovery-btn:hover { background: #D1D5DB !important; 
+.btn-close-modal {
+    background: none;
+    border: none;
+    color: #9CA3AF;
+    cursor: pointer;
+    font-size: 18px;
+    transition: var(--auth-smooth);
 }
-/* --- Global Toast Notification System --- */
+
+.btn-close-modal:hover {
+    color: var(--auth-text-main);
+}
+
+#cancel-recovery-btn:hover {
+    background: #D1D5DB !important; 
+}
+
+.sms-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.btn-inline-sms {
+    padding: 10px 16px;
+    background-color: var(--auth-brand-green);
+    color: #FFFFFF;
+    border: none;
+    border-radius: var(--auth-radius-input);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    height: 47px; 
+    transition: var(--auth-smooth);
+}
+
+.btn-inline-sms:hover {
+    background-color: #045235;
+}
+
 #toast-container {
     position: fixed;
     top: 24px;
@@ -407,7 +404,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    pointer-events: none; /* Allows clicking through the empty container area */
+    pointer-events: none;
 }
 
 .custom-toast {
@@ -437,7 +434,6 @@
     font-size: 18px;
 }
 
-/* Toast Color Themes */
 .toast-success { border-left: 4px solid #10B981; }
 .toast-success i { color: #10B981; }
 
@@ -448,16 +444,12 @@
 .toast-warning i { color: #F59E0B; }
 
 .toast-info { border-left: 4px solid #3B82F6; }
-.toast-info i { color: #3B82F6; 
-}
-/* --- Password Visibility Toggle --- */
+.toast-info i { color: #3B82F6; }
 
-/* Give the password inputs extra padding on the right so text doesn't slide under the eye icon */
 .input-with-icon input.password-field {
     padding-right: 48px;
 }
 
-/* Style and position the toggle button on the right */
 .btn-toggle-password {
     position: absolute;
     right: 12px;
@@ -479,9 +471,32 @@
     color: var(--auth-text-main);
 }
 
-/* Override the global left-icon rule so the eye icon doesn't jump to the left side */
 .input-with-icon .btn-toggle-password i {
     position: static !important;
     transform: none !important;
     left: auto !important;
+}
+
+@media screen and (max-width: 840px) {
+    .auth-card {
+        flex-direction: column;
+        min-height: auto;
+    }
+    .auth-brand {
+        width: 100%;
+        padding: 40px 30px;
+        text-align: center;
+        align-items: center;
+    }
+    .auth-brand h2 {
+        margin-top: 20px;
+    }
+    .brand-divider-line {
+        margin-top: 25px;
+        margin-bottom: 15px;
+    }
+    .auth-forms {
+        width: 100%;
+        padding: 35px;
+    }
 }

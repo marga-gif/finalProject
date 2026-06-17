@@ -45,7 +45,7 @@ body {
     width: 130%;            
     height: auto;
     object-fit: contain; 
-    opacity: 8;     
+    opacity: 0.8;     
     pointer-events: none;
     z-index: 1;
 }
@@ -124,32 +124,6 @@ body {
     margin-bottom: 35px;
 }
 
-.form-error {
-    background-color: #fee2e2;
-    border: 1.5px solid #ef4444;
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 24px;
-    color: #dc2626;
-    font-size: 0.95rem;
-    font-weight: 500;
-    display: none;
-    align-items: center;
-    gap: 10px;
-}
-
-.form-error[style*="display: flex"] {
-    display: flex !important;
-}
-
-.form-error::before {
-    content: "\f06a";
-    font-family: 'Font Awesome 6 Free';
-    font-weight: 900;
-    color: #ef4444;
-    font-size: 1.1rem;
-}
-
 .input-group {
     margin-bottom: 24px;
 }
@@ -166,6 +140,7 @@ body {
     position: relative;
     display: flex;
     align-items: center;
+    width: 100%;
 }
 
 .input-icon {
@@ -191,25 +166,6 @@ body {
     border-color: #10b981; 
     background-color: #ffffff;
     box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-}
-
-.input-wrapper input.input-error {
-    border-color: #ef4444;
-    background-color: #fef2f2;
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-}
-
-.input-wrapper input.input-error:focus {
-    border-color: #ef4444;
-    background-color: #ffffff;
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
-}
-
-.input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-    width: 100%;
 }
 
 .toggle-password-icon {
@@ -328,7 +284,195 @@ body {
     text-decoration: underline;
 }
 
+/* ADMIN LOG IN REDIRECT CONFIGURATIONS */
+.admin-divider-section {
+    margin-top: 20px; 
+    padding-top: 20px; 
+    border-top: 1px solid #e2e8f0; 
+    text-align: center;
+}
 
+.admin-divider-text {
+    font-size: 0.9rem; 
+    color: #64748b; 
+    margin-bottom: 12px;
+}
+
+.btn-admin-redirect {
+    display: inline-block; 
+    padding: 12px 24px; 
+    background-color: #032c63; 
+    color: white; 
+    text-decoration: none; 
+    border-radius: 10px; 
+    font-weight: 600; 
+    transition: background-color 0.2s;
+}
+
+.btn-admin-redirect:hover {
+    background-color: #021d42;
+}
+
+/* FORGOT PASSWORD MODAL OVERLAY STYLING */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.modal-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-card {
+    background-color: #ffffff;
+    width: 100%;
+    max-width: 440px;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    transform: scale(0.95);
+    transition: transform 0.25s ease;
+    position: relative;
+}
+
+.modal-backdrop.show .modal-card {
+    transform: scale(1);
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    color: #64748b;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.modal-close-btn:hover {
+    color: #1e293b;
+}
+
+.modal-card h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #032c63;
+    margin-bottom: 8px;
+}
+
+.modal-card .instruction {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.modal-card .btn-submit {
+    width: 100%;
+    padding: 14px;
+    background-color: #047857;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-card .btn-submit:hover {
+    background-color: #065f46;
+}
+
+.modal-card .btn-submit:disabled {
+    background-color: #94a3b8;
+    cursor: not-allowed;
+}
+
+.forgot-input-margin {
+    margin-bottom: 20px;
+}
+
+.forgot-wrapper-border {
+    border: 1px solid #e2e8f0; 
+    border-radius: 10px; 
+    padding: 0 16px;
+    background-color: #f1f5f9;
+}
+
+.forgot-wrapper-border:focus-within {
+    background-color: #ffffff;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.forgot-phone-icon {
+    color: #94a3b8; 
+    margin-right: 12px;
+}
+
+.forgot-clean-input {
+    border: none !important; 
+    background-color: transparent !important;
+    width: 100%; 
+    padding: 14px 0 !important; 
+    outline: none; 
+    font-size: 1rem;
+}
+
+/* ERROR & VALIDATION RESPONSE BOXES */
+.form-error {
+    background-color: #fef2f2;
+    color: #ef4444;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+    border-left: 4px solid #ef4444;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-success {
+    background-color: #f0fdf4;
+    color: #16a34a;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+    border-left: 4px solid #16a34a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.input-error {
+    border-color: #ef4444 !important;
+    background-color: #fffbfa !important;
+}
+
+/* SCREEN LAYOUT RESPONSIVENESS OVERRIDES */
 @media (max-width: 1024px) {
     .login-container {
         flex-direction: column;

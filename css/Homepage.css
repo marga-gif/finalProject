@@ -354,7 +354,7 @@ body{
     margin:auto;
     margin-bottom:80px;
     display:grid;
-
+    
     grid-template-columns:1fr 1fr;
     gap:25px;
 }
@@ -366,8 +366,13 @@ body{
 }
 
 .financial{
-    grid-column:1 / span 2;
-    justify-content:center;
+    grid-column:auto;
+    justify-content:left;
+}
+
+.about-us {
+    grid-column: 1 / span 2;
+    justify-content: center;
 }
 
 /* QUICK ACCESS */
@@ -524,7 +529,7 @@ body{
         margin-bottom:40px;
     }
 
-    .financial{
+    .about-us{
         grid-column:auto;
         justify-content:flex-start;
     }
