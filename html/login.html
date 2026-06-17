@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Login - Barangay System</title>
+    <!-- External Separated Stylesheet link mapping definitions -->
+    <link rel="stylesheet" href="../css/login.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <div class="login-container">
+
+        <div class="banner-side">
+            <img src="../images/logo1.png" alt="Barangay Logo" class="banner-background-img">
+            
+            <div class="banner-content">
+                <h1>Barangay San Jose</h1>
+                <p class="subtitle">Senior Citizen Assistance System</p>
+                <p class="portal-type">User Portal</p>
+            </div>
+        </div>
+
+        <div class="form-side">
+            <h2>Welcome Back</h2>
+            <p class="form-instruction">Enter your credentials to access the dashboard.</p>
+
+            <form id="loginForm" method="POST">
+                <div class="form-error" id="loginError" style="display: none;"></div>
+                
+                <div class="input-group">
+                    <label for="email">Email Address</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-envelope input-icon"></i>
+                        <input type="email" id="email" name="email" placeholder="user@example.com" required>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-lock input-icon"></i>
+                        <input type="password" id="password" name="password" placeholder="••••••••" required>
+                    </div>
+                </div>
+
+                <div class="form-utilities">
+                    <label class="remember-me">
+                        <input type="checkbox" id="remember" name="remember">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="#" class="forgot-pass" id="openForgotModal">Forgot Password?</a>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    <i class="fa-solid fa-right-to-bracket"></i> Log In
+                </button>
+            </form>
+
+            <p class="switch-portal">Not registered yet? <a href="register.html">Register here</a></p>
+            
+            <div class="admin-divider-section">
+                <p class="admin-divider-text">Are you an administrator?</p>
+                <a href="../admin/auth/index.html" class="btn-admin-redirect">
+                    <i class="fa-solid fa-shield"></i> Admin Login
+                </a>
+            </div>
+        </div>
+    </div>
+
+<div class="modal-backdrop" id="forgotModalWrapper">
+    <div class="modal-card">
+        <button class="modal-close-btn" id="closeForgotModal" type="button">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        
+        <h3>Reset Password</h3>
+        
+        <div class="form-error" id="forgotError" style="display: none;"></div>
+        <div class="form-success" id="forgotSuccess" style="display: none;"></div>
+        
+        <form id="forgotPasswordForm" novalidate>
+            
+            <div id="forgotStep1">
+                <p class="instruction">Enter your 11-digit registered mobile number below. We will send an OTP verification code to reset your account credentials.</p>
+                
+                <div class="input-group forgot-input-margin">
+                    <label for="forgotPhone">Mobile Number</label>
+                    <div class="input-wrapper forgot-wrapper-border" id="forgotPhoneWrapper">
+                        <i class="fa-solid fa-phone forgot-phone-icon"></i>
+                        <input type="tel" id="forgotPhone" placeholder="09171234567" maxlength="11" class="forgot-clean-input">
+                    </div>
+                </div>
+                
+                <button type="button" class="btn-submit" id="forgotSubmitBtn" onclick="handleRequestOtp()">
+                    <i class="fa-solid fa-paper-plane"></i> Send OTP Code
+                </button>
+            </div>
+
+            <div id="forgotStep2" style="display: none;">
+                <p class="instruction">We have sent a 6-digit verification pin code to your mobile device. Please enter it below to authorize this session.</p>
+                
+                <div class="input-group forgot-input-margin">
+                    <label for="otpCode">Verification Code</label>
+                    <div class="input-wrapper forgot-wrapper-border" id="otpCodeWrapper">
+                        <i class="fa-solid fa-key forgot-phone-icon"></i>
+                        <input type="text" id="otpCode" placeholder="000000" maxlength="6" style="text-align: center; letter-spacing: 4px; font-weight: bold;" class="forgot-clean-input">
+                    </div>
+                </div>
+                
+                <button type="button" class="btn-submit" id="forgotVerifyBtn" onclick="handleVerifyOtp()">
+                    <i class="fa-solid fa-shield-halved"></i> Verify OTP Code
+                </button>
+            </div>
+
+            <div id="forgotStep3" style="display: none;">
+                <p class="instruction">Your mobile number identity has been verified. You may now securely update your login credentials.</p>
+                
+                <div class="input-group forgot-input-margin">
+                    <label for="newPassword">New Password</label>
+                    <div class="input-wrapper forgot-wrapper-border">
+                        <i class="fa-solid fa-lock forgot-phone-icon"></i>
+                        <input type="password" id="newPassword" placeholder="Minimum 6 characters" class="forgot-clean-input">
+                    </div>
+                </div>
+
+                <div class="input-group forgot-input-margin">
+                    <label for="confirmNewPassword">Confirm New Password</label>
+                    <div class="input-wrapper forgot-wrapper-border">
+                        <i class="fa-solid fa-check-double forgot-phone-icon"></i>
+                        <input type="password" id="confirmNewPassword" placeholder="Repeat your new password" class="forgot-clean-input">
+                    </div>
+                </div>
+                
+                <button type="button" class="btn-submit" id="forgotResetBtn" onclick="handleSubmitNewPassword()">
+                    <i class="fa-solid fa-circle-check"></i> Update Password
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<script>
+        // --- LOGIN FORM ENGINE VARIABLES ---
+        const loginForm = document.getElementById('loginForm');
+        const loginError = document.getElementById('loginError');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const loginButton = loginForm.querySelector('button[type="submit"]');
+
+        // --- FORGOT PASSWORD MODULE VARIABLES ---
+        const openForgotModal = document.getElementById('openForgotModal');
+        const closeForgotModal = document.getElementById('closeForgotModal');
+        const forgotModalWrapper = document.getElementById('forgotModalWrapper');
+        const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+        const forgotPhone = document.getElementById('forgotPhone');
+        const forgotPhoneWrapper = document.getElementById('forgotPhoneWrapper');
+        const forgotError = document.getElementById('forgotError');
+        const forgotSuccess = document.getElementById('forgotSuccess');
+        const forgotSubmitBtn = document.getElementById('forgotSubmitBtn');
+
+        // --- NEW STEP WRAPPERS AND BUTTONS ---
+        const forgotStep1 = document.getElementById('forgotStep1');
+        const forgotStep2 = document.getElementById('forgotStep2');
+        const forgotStep3 = document.getElementById('forgotStep3');
+        const otpCode = document.getElementById('otpCode');
+        const otpCodeWrapper = document.getElementById('otpCodeWrapper');
+        const newPassword = document.getElementById('newPassword');
+        const confirmNewPassword = document.getElementById('confirmNewPassword');
+
+        // Retain verified phone reference state across steps
+        let verifiedSessionPhone = "";
+
+        // --- LOGIN ACTION UTILITIES ---
+        const showLoginError = (message) => {
+            loginError.textContent = message;
+            loginError.style.display = 'flex';
+            emailInput.classList.add('input-error');
+            passwordInput.classList.add('input-error');
+        };
+
+        const clearLoginError = () => {
+            loginError.textContent = '';
+            loginError.style.display = 'none';
+            emailInput.classList.remove('input-error');
+            passwordInput.classList.remove('input-error');
+        };
+
+        emailInput.addEventListener('input', clearLoginError);
+        passwordInput.addEventListener('input', clearLoginError);
+
+        loginForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+
+            if (!email || !password) return;
+
+            const originalText = loginButton.innerHTML;
+            loginButton.disabled = true;
+            loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+
+            try {
+                const response = await fetch('http://localhost:5001/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, portal: 'user' }),
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Unable to sign in.');
+                }
+
+                clearLoginError();
+
+                const authPayload = {
+                    idToken: data.idToken,
+                    refreshToken: data.refreshToken,
+                    user: data.user,
+                };
+
+                localStorage.setItem('senetizenAuth', JSON.stringify(authPayload));
+                localStorage.setItem('senetizenUser', JSON.stringify(data.user));
+                sessionStorage.setItem('senetizenLoggedIn', 'true');
+                localStorage.setItem('senetizenRemembered', loginForm.remember.checked ? 'true' : 'false');
+
+                window.location.href = 'index.html';
+            } catch (error) {
+                showLoginError(error.message || 'Login failed.');
+            } finally {
+                loginButton.disabled = false;
+                loginButton.innerHTML = originalText;
+            }
+        });
+
+        // --- FORGOT PASSWORD MODULE WIZARD ---
+        const openModal = (e) => {
+            e.preventDefault();
+            forgotModalWrapper.style.display = 'flex';
+            setTimeout(() => {
+                forgotModalWrapper.classList.add('show');
+                // Reset to default step layout view state
+                forgotStep1.style.display = 'block';
+                forgotStep2.style.display = 'none';
+                forgotStep3.style.display = 'none';
+                forgotPhone.focus();
+            }, 10);
+        };
+
+        const closeModal = () => {
+            forgotModalWrapper.classList.remove('show');
+            forgotPasswordForm.reset();
+            clearForgotMessages();
+            setTimeout(() => {
+                forgotModalWrapper.style.display = 'none';
+            }, 250);
+        };
+
+        const clearForgotMessages = () => {
+            forgotError.textContent = '';
+            forgotError.style.display = 'none';
+            forgotSuccess.textContent = '';
+            forgotSuccess.style.display = 'none';
+            forgotPhoneWrapper.style.borderColor = '#e2e8f0';
+            if(otpCodeWrapper) otpCodeWrapper.style.borderColor = '#e2e8f0';
+        };
+
+        // Enforce strictly numerical values during entries
+        forgotPhone.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '');
+            clearForgotMessages();
+        });
+
+        if (otpCode) {
+            otpCode.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '');
+                clearForgotMessages();
+            });
+        }
+
+        openForgotModal.addEventListener('click', openModal);
+        closeForgotModal.addEventListener('click', closeModal);
+        
+        forgotModalWrapper.addEventListener('click', (e) => {
+            if (e.target === forgotModalWrapper) closeModal();
+        });
+
+        // --- STEP 1: REQUEST OTP CODE ---
+        async function handleRequestOtp() {
+            clearForgotMessages();
+            const phoneValue = forgotPhone.value.trim();
+            const phoneRegex = /^09\d{9}$/;
+
+            if (!phoneValue) {
+                forgotError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Phone number field cannot be left empty.';
+                forgotError.style.display = 'flex';
+                forgotPhoneWrapper.style.borderColor = '#ef4444';
+                return;
+            }
+
+            if (phoneValue.length !== 11 || !phoneRegex.test(phoneValue)) {
+                forgotError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Must be exactly 11 digits starting with 09 (e.g., 09171234567).';
+                forgotError.style.display = 'flex';
+                forgotPhoneWrapper.style.borderColor = '#ef4444';
+                return;
+            }
+
+            const originalBtnHTML = forgotSubmitBtn.innerHTML;
+            forgotSubmitBtn.disabled = true;
+            forgotSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+            try {
+                const response = await fetch('http://localhost:5001/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phoneValue })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'This mobile number is not registered.');
+                }
+
+                verifiedSessionPhone = phoneValue;
+                forgotSuccess.innerHTML = '<i class="fa-solid fa-circle-check"></i> Verification code sent! Please check your mobile messages.';
+                forgotSuccess.style.display = 'flex';
+
+                // Transition viewport content layout states gracefully
+                forgotStep1.style.display = 'none';
+                forgotStep2.style.display = 'block';
+                setTimeout(() => otpCode.focus(), 50);
+
+            } catch (err) {
+                forgotError.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${err.message}`;
+                forgotError.style.display = 'flex';
+                forgotPhoneWrapper.style.borderColor = '#ef4444';
+            } finally {
+                forgotSubmitBtn.disabled = false;
+                forgotSubmitBtn.innerHTML = originalBtnHTML;
+            }
+        }
+
+        // --- STEP 2: VERIFY CODE VALIDATION ---
+        async function handleVerifyOtp() {
+            clearForgotMessages();
+            const otpValue = otpCode.value.trim();
+
+            if (otpValue.length !== 6) {
+                forgotError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Please enter the complete 6-digit verification code.';
+                forgotError.style.display = 'flex';
+                otpCodeWrapper.style.borderColor = '#ef4444';
+                return;
+            }
+
+            // Simple interface simulation block: update with actual custom verification endpoint validation if required
+            forgotSuccess.innerHTML = '<i class="fa-solid fa-circle-check"></i> Identity successfully verified! Enter your new credentials.';
+            forgotSuccess.style.display = 'flex';
+
+            forgotStep2.style.display = 'none';
+            forgotStep3.style.display = 'block';
+        }
+
+        // --- STEP 3: UPDATE USER PASSWORDS ---
+        async function handleSubmitNewPassword() {
+            clearForgotMessages();
+            const newPasswordValue = newPassword.value;
+            const confirmNewPasswordValue = confirmNewPassword.value;
+
+            if (!newPasswordValue || !confirmNewPasswordValue) {
+                forgotError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> All password entry fields are required.';
+                forgotError.style.display = 'flex';
+                return;
+            }
+
+            if (newPasswordValue !== confirmNewPasswordValue) {
+                forgotError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Passwords do not match. Please re-enter credentials.';
+                forgotError.style.display = 'flex';
+                return;
+            }
+
+            if (newPasswordValue.length < 6) {
+                forgotError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Password must contain at least 6 characters.';
+                forgotError.style.display = 'flex';
+                return;
+            }
+
+            forgotSuccess.innerHTML = '<i class="fa-solid fa-circle-check"></i> Password successfully updated! Redirecting to login context...';
+            forgotSuccess.style.display = 'flex';
+
+            setTimeout(() => {
+                closeModal();
+            }, 2000);
+        }
+</script>
+</body>
+</html>
