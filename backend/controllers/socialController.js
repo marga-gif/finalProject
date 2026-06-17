@@ -13,7 +13,31 @@ export async function getEvents(req, res) {
 
 export async function getAnnouncements(req, res) {
   const announcements = await getCollection("announcements");
-  res.json(announcements);
+  res.json(
+    announcements.sort((a, b) =>
+      (b.publishedAt || b.createdAt || "").localeCompare(a.publishedAt || a.createdAt || "")
+    )
+  );
+}
+
+export async function createAnnouncement(req, res) {
+  const { title, message, pushAsSms } = req.body;
+
+  if (!title || !message) {
+    return res.status(400).json({ error: "Title and message are required." });
+  }
+
+  const announcement = await addRecord("announcements", {
+    title,
+    message,
+    pushAsSms: Boolean(pushAsSms),
+    publishedBy: req.user?.email || req.user?.fullName || "admin",
+    publishedAt: new Date().toISOString(),
+    category: "announcement",
+  });
+
+  await logAudit(req, "ANNOUNCEMENT_CREATED", { title });
+  res.status(201).json(announcement);
 }
 
 export async function createEvent(req, res) {

@@ -3,22 +3,23 @@ import {
   registerUser,
   registerAdmin,
   loginUser,
-  forgotPassword, 
+  forgotPassword,
+  verifyOtp,   
+  resetPassword, 
   getProfile,
-  updateProfile,
+  updateProfile
 } from "../controllers/authController.js";
-import { authenticate } from "../middleware/auth.js";
-import { requireUserOrAdmin } from "../middleware/authorize.js";
 
 const router = Router();
 
+// Your other working routes...
 router.post("/register", registerUser);
-router.post("/register/admin", registerAdmin);
+router.post("/register-admin", registerAdmin);
 router.post("/login", loginUser);
 
+// --- ADD / VERIFY THESE THREE ENDPOINTS FOR YOUR WIZARD ---
 router.post("/forgot-password", forgotPassword);
-
-router.get("/profile", authenticate, requireUserOrAdmin, getProfile);
-router.patch("/profile", authenticate, requireUserOrAdmin, updateProfile);
+router.post("/verify-otp", verifyOtp);
+router.post("/reset-password", resetPassword);
 
 export default router;

@@ -45,6 +45,21 @@ export async function getFinanceOptions(req, res) {
   res.json(FINANCE_INFO);
 }
 
+function normalizeFinancialRequest(item) {
+  return {
+    id: item.id || item.requestId || null,
+    seniorId: item.seniorId || item.requesterSeniorId || item.userId || "SC-N/A",
+    name: item.requesterName || item.fullName || item.requesterEmail || "Unknown Citizen",
+    purok: item.purok || item.requesterPurok || item.address || "",
+    amount: Number(item.amount) || 0,
+    status: item.status || "Pending Review",
+    requestType: item.requestType || item.category || "Financial Assistance",
+    reason: item.reason || item.supportingDetails || "",
+    userId: item.userId || "",
+    createdAt: item.createdAt || item.createdDate || "",
+  };
+}
+
 export async function getAssistanceRequests(req, res) {
   let requests = await getCollection("financialRequests");
 
@@ -52,7 +67,11 @@ export async function getAssistanceRequests(req, res) {
     requests = requests.filter((item) => item.userId === req.user.uid);
   }
 
-  res.json(requests.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")));
+  const normalized = requests
+    .map(normalizeFinancialRequest)
+    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+  res.json(normalized);
 }
 
 export async function submitAssistanceRequest(req, res) {
@@ -66,6 +85,8 @@ export async function submitAssistanceRequest(req, res) {
     userId: req.user.uid,
     requesterName: req.user.fullName,
     requesterEmail: req.user.email,
+    seniorId: req.user.profile?.seniorId || "SC-N/A",
+    purok: req.user.profile?.purok || "",
     requestType,
     amount: Number(amount) || 0,
     reason,

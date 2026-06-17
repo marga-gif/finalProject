@@ -4,6 +4,7 @@ import {
   getAnnouncements,
   createEvent,
   updateEvent,
+  createAnnouncement,
   registerForEvent,
   getEventRegistrations,
   submitContact,
@@ -21,6 +22,7 @@ const router = Router();
 
 router.get("/events", getEvents);
 router.get("/announcements", getAnnouncements);
+router.post("/announcements", authenticate, requireAdmin, createAnnouncement);
 router.get("/about", getAbout);
 router.get("/search", globalSearch);
 router.post("/contacts", optionalAuth, submitContact);

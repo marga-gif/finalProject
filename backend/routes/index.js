@@ -9,12 +9,14 @@ import { getDoctors, getAppointments, createAppointment } from "../controllers/m
 import {
   getEvents,
   getAnnouncements,
+  createAnnouncement,
   getAbout,
   globalSearch,
   submitContact,
+  getDashboardStats,
 } from "../controllers/socialController.js";
 import { authenticate, optionalAuth } from "../middleware/auth.js";
-import { requireUserOrAdmin } from "../middleware/authorize.js";
+import { requireAdmin, requireUserOrAdmin } from "../middleware/authorize.js";
 
 const router = Router();
 

@@ -50,6 +50,34 @@ export async function getDocumentCategories(req, res) {
   res.json(DOCUMENT_CATEGORIES);
 }
 
+function normalizeRequestItem(item) {
+  const status = String(item.status || 'Pending Review').trim().toLowerCase();
+  const normalizedStatus =
+    status === 'pending' || status === 'pending review'
+      ? 'Pending Review'
+      : status === 'processing'
+      ? 'Processing'
+      : status === 'ready' || status === 'ready for pickup'
+      ? 'Ready for Pickup'
+      : status === 'completed'
+      ? 'Completed'
+      : 'Pending Review';
+
+  return {
+    id: item.id || item.requestId || item.userId || null,
+    requestId: item.requestId || `REQ-${String(item.id || item.userId || Date.now()).slice(-8)}`,
+    citizenName: item.citizenName || item.fullName || item.userDisplayName || item.userEmail || 'Unknown Citizen',
+    citizenEmail: item.citizenEmail || item.email || item.userEmail || '',
+    documentType: item.documentType || item.category || 'Document Request',
+    dateSubmitted: item.dateSubmitted || item.createdDate || item.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+    status: normalizedStatus,
+    category: item.category || '',
+    userId: item.userId || '',
+    purpose: item.purpose || '',
+    adminNotes: item.adminNotes || '',
+  };
+}
+
 export async function getDocumentRequests(req, res) {
   let requests = await getCollection("documentRequests");
 
@@ -57,7 +85,11 @@ export async function getDocumentRequests(req, res) {
     requests = requests.filter((item) => item.userId === req.user.uid);
   }
 
-  res.json(requests.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")));
+  const normalized = requests
+    .map(normalizeRequestItem)
+    .sort((a, b) => (b.dateSubmitted || "").localeCompare(a.dateSubmitted || ""));
+
+  res.json(normalized);
 }
 
 export async function submitDocumentRequest(req, res) {
