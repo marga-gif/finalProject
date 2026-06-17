@@ -1,6 +1,8 @@
 import { auth, isFirebaseReady } from "../config/firebase.js";
 import { addRecord, getRecordById, updateRecord } from "../services/firestoreService.js";
 import { logAudit } from "../middleware/audit.js";
+// If you have a querying method in your firestoreService like getRecords, import it here
+// e.g., import { getRecords } from "../services/firestoreService.js";
 
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
 const ADMIN_REGISTRATION_TOKEN = process.env.ADMIN_REGISTRATION_TOKEN || "1234567890123";
@@ -233,6 +235,32 @@ export async function loginUser(req, res) {
         ? "Invalid email or password."
         : error.message;
     res.status(401).json({ error: friendly });
+  }
+}
+
+// --- NEW FORGOT PASSWORD CONTROLLER FOR OTP DISPATCH ---
+export async function forgotPassword(req, res) {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number is required." });
+    }
+
+    
+    // --- INTEGRATE YOUR SMS GATEWAY / OTP SERVICE LOGIC HERE ---
+    console.log(`Generating verification pin code workflow for: ${phone}`);
+
+    await logAudit(req, "OTP_REQUESTED", { mobile: phone });
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification code sent! Please check your mobile messages.",
+    });
+
+  } catch (error) {
+    console.error("Forgot Password Module Exception Error:", error);
+    return res.status(500).json({ error: "Internal server error encountered while handling password request." });
   }
 }
 

@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const publicRoot = path.join(__dirname, "..");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN || "*",
