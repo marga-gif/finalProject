@@ -24,7 +24,7 @@ const REGEX_RULES = {
     strongPassword: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/ 
 };
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = window.API_BASE;
 
 function getAdminToken() {
     const storedAuth = JSON.parse(localStorage.getItem('barangay_admin_auth') || 'null');
@@ -259,12 +259,12 @@ function setupPasswordToggles() {
             
             if (input.type === 'password') {
                 input.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                input.type = 'password';
                 icon.classList.remove('fa-eye-slash');
                 icon.classList.add('fa-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
             }
         });
     });

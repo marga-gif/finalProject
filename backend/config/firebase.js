@@ -1,8 +1,12 @@
 import admin from "firebase-admin";
 import { readFileSync } from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let db = null;
 let auth = null;
@@ -18,8 +22,12 @@ function parseServiceAccount() {
     }
   }
 
-  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  let credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (credPath) {
+    // If it's a relative path, resolve it from the backend directory
+    if (!path.isAbsolute(credPath)) {
+      credPath = path.join(__dirname, "..", credPath);
+    }
     try {
       return JSON.parse(readFileSync(credPath, "utf8"));
     } catch (err) {

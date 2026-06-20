@@ -1,8 +1,6 @@
 // ==========================================
 // TOAST NOTIFICATION ENGINE
 // ==========================================
-
-const API_BASE_URL = 'http://localhost:5001/api';
 window.showToast = function(message, type = 'info') {
     let container = document.getElementById('toast-container');
     if (!container) {
@@ -122,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loginBtn.disabled = true;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/login`, {
+                const response = await fetch(`${window.API_BASE}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password, portal: 'admin' }),
@@ -201,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 registerBtn.disabled = true;
 
                 try {
-                    const response = await fetch(`${API_BASE_URL}/register/admin`, {
+                    const response = await fetch(`${window.API_BASE}/auth/register/admin`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({

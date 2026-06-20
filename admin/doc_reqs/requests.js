@@ -33,7 +33,7 @@ let localRequestsCache = [
     }
 ];
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = window.API_BASE;
 let currentActiveFilter = "all";
 let currentPage = 1;
 let itemsPerPage = 10;

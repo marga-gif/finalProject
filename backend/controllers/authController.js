@@ -1,11 +1,28 @@
 import { auth, isFirebaseReady } from "../config/firebase.js";
-import { addRecord, getRecordById, updateRecord } from "../services/firestoreService.js";
-import { logAudit } from "../middleware/audit.js";
-// If you have a querying method in your firestoreService like getRecords, import it here
-// e.g., import { getRecords } from "../services/firestoreService.js";
+import { addRecord, getRecordById, updateRecord, queryCollection } from "../services/firestoreService.js";
+import { logAudit, logAdminAudit, logAdminAuthAudit } from "../middleware/audit.js";
 
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
 const ADMIN_REGISTRATION_TOKEN = process.env.ADMIN_REGISTRATION_TOKEN || "1234567890123";
+const OTP_EXPIRATION_MS = 5 * 60 * 1000;
+const otpStore = new Map();
+
+function normalizePhoneNumber(phone) {
+  let normalized = String(phone || "").trim();
+  if (normalized.startsWith("+63")) {
+    normalized = "0" + normalized.slice(3);
+  }
+  return normalized;
+}
+
+function isValidPhoneNumber(phone) {
+  const normalized = normalizePhoneNumber(phone);
+  return /^09\d{9}$/.test(normalized);
+}
+
+function generateOtpCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 async function signInWithPassword(email, password) {
   const response = await fetch(
@@ -85,12 +102,17 @@ export async function registerUser(req, res) {
 
     const normalizedFirstName = (firstName || "").trim();
     const normalizedLastName = (lastName || "").trim();
+    const normalizedMobile = normalizePhoneNumber(mobile);
     const displayName = [normalizedFirstName, (middleName || "").trim(), normalizedLastName]
       .filter(Boolean)
       .join(" ");
 
     if (!normalizedFirstName || !normalizedLastName || !email || !password) {
       return res.status(400).json({ error: "First name, last name, email, and password are required." });
+    }
+
+    if (!normalizedMobile || !isValidPhoneNumber(normalizedMobile)) {
+      return res.status(400).json({ error: "Mobile number must be 11 digits starting with 09 or +639." });
     }
 
     if (password !== confirmPassword) {
@@ -124,7 +146,7 @@ export async function registerUser(req, res) {
       birthDate: birthDate || "",
       gender: gender || "",
       email,
-      mobile: mobile || "",
+      mobile: normalizedMobile || "",
       street: street || "",
       barangay: barangay || "",
       city: city || "",
@@ -162,6 +184,10 @@ export async function registerAdmin(req, res) {
       return res.status(403).json({ error: "Invalid admin registration token." });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters." });
+    }
+
     if (!isFirebaseReady || !auth) {
       return res.status(503).json({ error: "Firebase is not configured on the server." });
     }
@@ -188,7 +214,7 @@ export async function registerAdmin(req, res) {
       status: "active",
     });
 
-    await logAudit(req, "ADMIN_REGISTERED", { uid: userRecord.uid, email });
+    await logAdminAuthAudit(email, "ADMIN_REGISTRATION", { uid: userRecord.uid, email, fullName });
 
     res.status(201).json({
       message: "Admin account created successfully.",
@@ -226,7 +252,12 @@ export async function loginUser(req, res) {
       return res.status(403).json({ error: "Please use the Administrator Portal to sign in." });
     }
 
-    await logAudit({ ...req, user: response.user }, "USER_LOGIN", { email });
+    const auditReq = { ...req, user: response.user };
+    if (portal === 'admin') {
+      await logAdminAudit(auditReq, "ADMIN_LOGIN", { email });
+    } else {
+      await logAudit(auditReq, "USER_LOGIN", { email });
+    }
 
     res.json(response);
   } catch (error) {
@@ -238,111 +269,117 @@ export async function loginUser(req, res) {
   }
 }
 
-// --- FORGOT PASSWORD CONTROLLER FOR OTP DISPATCH ---
 export async function forgotPassword(req, res) {
   try {
     const { phone } = req.body;
+    const normalizedPhone = normalizePhoneNumber(phone);
 
-    if (!phone) {
+    if (!normalizedPhone) {
       return res.status(400).json({ error: "Phone number is required." });
     }
 
-    console.log(`Generating verification pin code workflow for: ${phone}`);
+    if (!isValidPhoneNumber(normalizedPhone)) {
+      return res.status(400).json({ error: "Phone number must be 11 digits starting with 09 or +639." });
+    }
 
-    await logAudit(req, "OTP_REQUESTED", { mobile: phone });
+    const matchedUsers = await queryCollection("users", [
+      { field: "mobile", op: "==", value: normalizedPhone },
+    ]);
 
-    return res.status(200).json({
-      success: true,
-      message: "Verification code sent! Please check your mobile messages.",
-    });
+    if (!matchedUsers.length) {
+      return res.status(404).json({ error: "Mobile number is not registered." });
+    }
 
+    const user = matchedUsers[0];
+    const otpCode = generateOtpCode();
+    const expiration = Date.now() + OTP_EXPIRATION_MS;
+    otpStore.set(normalizedPhone, { code: otpCode, expiresAt: expiration });
+
+    console.log(`Forgot password OTP for ${normalizedPhone}: ${otpCode} (expires in 5 minutes)`);
+
+    return res.json({ message: "Verification code sent. Use the code shown in the server logs for demo purposes." });
   } catch (error) {
-    console.error("Forgot Password Module Exception Error:", error);
-    return res.status(500).json({ error: "Internal server error encountered while handling password request." });
+    console.error("Forgot password request failed:", error);
+    return res.status(500).json({ error: "Forgot password request could not be processed." });
   }
 }
 
-// --- VERIFY OTP CONTROLLER ---
+function getStoredOtp(phone) {
+  const stored = otpStore.get(phone);
+  if (!stored) return null;
+  if (Date.now() > stored.expiresAt) {
+    otpStore.delete(phone);
+    return null;
+  }
+  return stored;
+}
+
 export async function verifyOtp(req, res) {
   try {
-    const { mobileNumber, otpCode } = req.body;
+    const { phone, otp } = req.body;
+    const normalizedPhone = normalizePhoneNumber(phone);
 
-    if (!mobileNumber || !otpCode) {
-      return res.status(400).json({ error: "Mobile number and OTP code are required." });
+    if (!normalizedPhone || !otp) {
+      return res.status(400).json({ error: "Phone and OTP are required." });
     }
 
-    // Accepting '123456' as the development bypass code
-    if (otpCode !== "123456" && otpCode.length !== 6) {
-      return res.status(400).json({ error: "Invalid or expired OTP verification code." });
+    const stored = getStoredOtp(normalizedPhone);
+    if (!stored || stored.code !== String(otp).trim()) {
+      return res.status(400).json({ error: "Invalid or expired verification code." });
     }
 
-    await logAudit(req, "OTP_VERIFICATION_SUCCESSFUL", { mobile: mobileNumber });
-
-    return res.status(200).json({
-      success: true,
-      message: "OTP code verified successfully.",
-      status: "OTP_VERIFIED"
-    });
-
+    return res.json({ message: "OTP verified." });
   } catch (error) {
-    console.error("Verify OTP Module Exception Error:", error);
-    return res.status(500).json({ error: "Internal server error encountered during verification." });
+    console.error("OTP verification failed:", error);
+    return res.status(500).json({ error: "OTP verification could not be processed." });
   }
 }
 
-// --- RESET PASSWORD CONTROLLER ---
 export async function resetPassword(req, res) {
   try {
-    const { mobileNumber, newPassword } = req.body;
+    const { phone, otp, newPassword } = req.body;
+    const normalizedPhone = normalizePhoneNumber(phone);
 
-    if (!mobileNumber || !newPassword) {
-      return res.status(400).json({ error: "Mobile number and new password are required." });
+    if (!normalizedPhone || !otp || !newPassword) {
+      return res.status(400).json({ error: "Phone, OTP, and new password are required." });
     }
 
-    if (!isFirebaseReady || !auth) {
-      return res.status(503).json({ error: "Firebase is not configured." });
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: "New password must be at least 6 characters long." });
     }
 
-    // 1. Format the phone number to look up both variations if necessary
-    const localPhone = mobileNumber.trim(); // e.g. "09171234567"
-    const internationalPhone = localPhone.startsWith('0') ? `+63${localPhone.slice(1)}` : localPhone;
-
-    let userUid = null;
-
-    // 2. Try looking up the authentication profile directly via phone database engine
-    try {
-      const userRecord = await auth.getUserByPhoneNumber(internationalPhone);
-      userUid = userRecord.uid;
-    } catch (err) {
-      console.log("Direct phone auth lookup failed. Attempting database profile check...");
+    const stored = getStoredOtp(normalizedPhone);
+    if (!stored || stored.code !== String(otp).trim()) {
+      return res.status(400).json({ error: "Invalid or expired verification code." });
     }
 
-    // 3. Fallback: If you store the mobile string inside a Firestore collection record instead:
-    if (!userUid) {
-      // If your firestoreService has a querying option, use it here to map phone -> UID.
-      // Example placeholder: const profile = await findUserByMobile(localPhone);
-      // userUid = profile.uid;
-      
-      return res.status(404).json({ 
-        error: "This phone number is not explicitly linked to an authentication profile. Try Option 1 (Email Reset)." 
-      });
+    const matchedUsers = await queryCollection("users", [
+      { field: "mobile", op: "==", value: normalizedPhone },
+    ]);
+
+    if (!matchedUsers.length) {
+      return res.status(404).json({ error: "Mobile number is not registered." });
     }
 
-    // 4. Automatically update the authentication record
-    await auth.updateUser(userUid, {
-      password: newPassword
+    const user = matchedUsers[0];
+
+    if (isFirebaseReady && auth) {
+      await auth.updateUser(user.uid, { password: newPassword });
+    } else {
+      await updateRecord("users", user.uid, { password: newPassword });
+    }
+
+    otpStore.delete(normalizedPhone);
+    await logAudit(req, "PASSWORD_RESET_COMPLETED", {
+      uid: user.uid,
+      email: user.email,
+      mobile: normalizedPhone,
     });
 
-    await logAudit(req, "PASSWORD_RESET_SUCCESSFUL", { uid: userUid, mobile: mobileNumber });
-
-    return res.status(200).json({
-      success: true,
-      message: "Database record updated successfully.",
-    });
-
+    return res.json({ message: "Password reset successfully." });
   } catch (error) {
-    console.error("Database Automation Error:", error);
-    return res.status(500).json({ error: error.message || "Internal database connection failure." });
+    console.error("Password reset failed:", error);
+    return res.status(500).json({ error: "Password reset could not be completed." });
   }
 }
 

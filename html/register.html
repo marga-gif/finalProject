@@ -108,7 +108,13 @@
                         <label for="mobile">Mobile Number</label>
                         <div class="input-wrapper">
                             <i class="fa-solid fa-phone input-icon"></i>
-                            <input type="tel" id="mobile" name="mobile" placeholder="09123456789" inputmode="numeric" maxlength="11" required>
+                            <input type="tel"
+                            id="mobile"
+                            name="mobile"
+                            placeholder="09123456789"
+                            inputmode="numeric"
+                            maxlength="11"
+                            required>
                         </div>
                     </div>
                     <div class="form-row">
@@ -185,14 +191,19 @@
                     <p class="step-description">Upload a profile photo for your account.</p>
                     <div class="profile-photo-wrapper">
                         <div class="photo-preview" id="photoPreview">
-                            <i class="fa-solid fa-circle-user photo-placeholder-icon"></i>
+                            <i class="fa-sol                    id fa-circle-user photo-placeholder-icon"></i>
                             <img id="photoPreviewImg" alt="Profile preview">
                         </div>
-                        <input type="file" id="profilePhotoInput" accept="image/*" hidden>
+                       <input type="file" id="profilePhotoInput" accept=".jpg,.jpeg,.png" hidden>
                     </div>
                     <div class="photo-buttons">
                         <button type="button" class="btn-alt" id="uploadPhotoBtn"><i class="fa-solid fa-upload"></i> Upload Photo</button>
                     </div>
+                    <p class="upload-note">
+                        <i class="fa-solid fa-circle-info"></i>
+                    Accepted file formats: JPG, JPEG, PNG only.
+                    Maximum file size: 5 MB.
+                    </p>
                 </div>
 
                 <div class="form-step" data-step="4">
@@ -307,7 +318,7 @@
 
         const getMaxBirthDate = () => {
             const today = new Date();
-            return new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+            return new Date(today.getFullYear() - 60, today.getMonth(), today.getDate());
         };
 
         birthDateInput.min = '1900-01-01';
@@ -416,9 +427,11 @@
                 if (!firstName) { showError('First Name is required.'); return false; }
                 if (!lastName) { showError('Last Name is required.'); return false; }
                                 if (!birthDate) { showError('Birth Date is required.'); return false; }
-                if (birthDate < birthDateInput.min || birthDate > birthDateInput.max) { showError('Registrant must be at least 18 years old and birth date must be from 1900 onward.'); return false; }
+               const age = getAge(birthDate);
+                if (age < 60) {showError('Only senior citizens aged 60 years old and above may register.');return false;}
                 if (!email) { showError('Email Address is required.'); return false; }
                 if (!mobile) { showError('Mobile Number is required.'); return false; }
+                if (!/^09\d{9}$/.test(mobile)) {showError('Mobile Number must be 11 digits and start with 09.');return false;}
                                 if (!password) { showError('Password is required.'); return false; }
                 if (!isPasswordValid(password)) { showError('Password must meet all password requirements.'); return false; }
                 if (!confirmPassword) { showError('Confirm Password is required.'); return false; }
@@ -619,17 +632,45 @@
 });
       passwordChecklist.hidden = true;
 
-        profilePhotoInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-                photoPreviewImg.src = reader.result;
-                photoPreviewImg.hidden = false;
-                photoPreview.classList.add('has-photo');
-            };
-            reader.readAsDataURL(file);
-        });
+      profilePhotoInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Allowed file types
+    const allowedTypes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png'
+    ];
+
+    // Check file type
+    if (!allowedTypes.includes(file.type)) {
+        showError('Only JPG, JPEG, and PNG files are allowed.');
+        profilePhotoInput.value = '';
+        return;
+    }
+
+    // Check file size (5MB maximum)
+    const maxSize = 5 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+        showError('File size must not exceed 5MB.');
+        profilePhotoInput.value = '';
+        return;
+    }
+
+    clearError();
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+        photoPreviewImg.src = reader.result;
+        photoPreviewImg.hidden = false;
+        photoPreview.classList.add('has-photo');
+    };
+
+    reader.readAsDataURL(file);
+});
 
         closeModal.addEventListener('click', () => {
             modalOverlay.classList.remove('visible');
@@ -645,6 +686,20 @@
 
         showStepIndex(currentStepIndex);
         updatePasswordMatch();
+
+        const mobileInput = document.getElementById('mobile');
+
+        mobileInput.addEventListener('input', function () {
+
+    // Numbers only
+    this.value = this.value.replace(/[^0-9]/g, '');
+
+    // Maximum 11 digits
+    if (this.value.length > 11) {
+        this.value = this.value.slice(0, 11);
+    }
+
+});
     </script>
 </body>
 </html>

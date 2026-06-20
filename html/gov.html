@@ -305,7 +305,7 @@ function uploadField(label){
     <div class="form-group full-width">
         <label>${label}</label>
         <input type="file" accept=".jpg,.jpeg,.png" multiple>
-        <small class="file-note">Accepted files: JPEG, JPG, PNG only</small>
+        <small class="file-note">Accepted file formats: JPG, JPEG, PNG only. Maximum file size: 5 MB.</small>
     </div>`;
 }
 
@@ -367,12 +367,59 @@ function openDocumentForm(documentName){
     document.getElementById("documentModal").classList.add("show");
 }
 
+/* File Upload Validation: type and size */
+const ALLOWED_FILE_TYPES = ["image/jpeg", "image/png"];
+const ALLOWED_FILE_EXTENSIONS = [".jpg", ".jpeg", ".png"];
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_COUNT = 5;
+
+function getFileExtension(fileName){
+    const lastDot = fileName.lastIndexOf(".");
+    return lastDot === -1 ? "" : fileName.slice(lastDot).toLowerCase();
+}
+
+function formatFileSize(bytes){
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+}
+
 document.addEventListener("change", function(e){
-    if(e.target.type === "file"){
-        if(e.target.files.length > 5){
-            alert("Maximum of 5 documents only.");
-            e.target.value = "";
+    if(e.target.type !== "file") return;
+
+    const input = e.target;
+    const files = Array.from(input.files);
+
+    if(files.length === 0) return;
+
+    if(files.length > MAX_FILE_COUNT){
+        alert(`Maximum of ${MAX_FILE_COUNT} documents only.`);
+        input.value = "";
+        return;
+    }
+
+    const invalidTypeFiles = [];
+    const oversizedFiles = [];
+
+    files.forEach(file => {
+        const extension = getFileExtension(file.name);
+        const isValidType = ALLOWED_FILE_TYPES.includes(file.type) || ALLOWED_FILE_EXTENSIONS.includes(extension);
+        if(!isValidType){
+            invalidTypeFiles.push(file.name);
         }
+        if(file.size > MAX_FILE_SIZE_BYTES){
+            oversizedFiles.push(`${file.name} (${formatFileSize(file.size)})`);
+        }
+    });
+
+    if(invalidTypeFiles.length > 0){
+        alert(`Invalid file format for: ${invalidTypeFiles.join(", ")}.\nAccepted file formats: JPG, JPEG, PNG only.`);
+        input.value = "";
+        return;
+    }
+
+    if(oversizedFiles.length > 0){
+        alert(`File too large for: ${oversizedFiles.join(", ")}.\nMaximum file size: 5 MB.`);
+        input.value = "";
+        return;
     }
 });
 

@@ -56,7 +56,7 @@ const itemsPerPage = 10;
 let currentDropdownModuleFilter = "all";
 let globalSearchQueryText = "";
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = window.API_BASE;
 
 function getAdminToken() {
   const storedAuth = JSON.parse(localStorage.getItem('barangay_admin_auth') || 'null');

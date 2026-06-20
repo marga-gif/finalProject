@@ -490,6 +490,37 @@ body{
 }
 
 .request-submit{
+}
+
+.textarea-counter {
+    margin-top: 6px;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.input-error {
+    border-color: #ef4444;
+    background: #fff1f2;
+}
+
+.request-error-summary ul {
+    margin: 8px 0 0 16px;
+}
+
+.request-error-summary strong {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.request-error-summary li {
+    margin-bottom: 4px;
+}
+
+.request-error-summary {
+    font-size: 0.95rem;
+}
+
+.request-submit{
     grid-column:1 / -1;
     height:55px;
     border:none;

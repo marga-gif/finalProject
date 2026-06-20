@@ -27,7 +27,7 @@ const mockDashboardData = {
     ]
 };
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = window.API_BASE;
 
 // ==========================================
 // AUTHENTICATION CHECK

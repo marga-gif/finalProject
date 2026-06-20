@@ -318,18 +318,19 @@
                 <div class="form-group">
                     <label for="attachment1">Attachment 1</label>
                     <input type="file" id="attachment1" name="attachment1" accept=".jpeg,.jpg,.png,image/jpeg,image/png">
-                    <small>Accepted files: JPEG, JPG, PNG only</small>
+                    <small class="file-note">Accepted file formats: JPG, JPEG, PNG only. Maximum file size: 5 MB.</small>
                 </div>
 
                 <div class="form-group">
                     <label for="contactInfo">Contact Info</label>
-                    <input type="text" id="contactInfo" name="contactInfo" maxlength="11" pattern="[0-9]{11}" inputmode="numeric" placeholder="09XX XXX XXXX" required>
+                    <input type="text" id="contactInfo" name="contactInfo" maxlength="13" pattern="^(?:09[0-9]{9}|\+639[0-9]{9})$" inputmode="numeric" placeholder="09123456789" required>
+                    <p class="field-error" id="contactInfoError" style="display:none;">Enter 11 digits starting with 09 or +63 country code.</p>
                 </div>
 
                 <div class="form-group">
                     <label for="attachment2">Attachment 2</label>
                     <input type="file" id="attachment2" name="attachment2" accept=".jpeg,.jpg,.png,image/jpeg,image/png">
-                    <small>Accepted files: JPEG, JPG, PNG only</small>
+                    <small class="file-note">Accepted file formats: JPG, JPEG, PNG only. Maximum file size: 5 MB.</small>
                 </div>
 
                 <div class="form-group">
@@ -357,12 +358,14 @@
                 </div>
             </div>
 
+            <div class="form-error" id="appointmentError" style="display:none; margin-top: 8px;"></div>
             <button class="submit-btn" type="submit">Submit Appointment</button>
         </form>
 
         <div class="success-message" id="successMessage">
             <h3>Appointment Successfully Booked</h3>
             <p id="appointmentSchedule"></p>
+            <p id="appointmentReference"></p>
             <em>Please arrive 15 minutes before your scheduled appointment and bring any valid ID</em>
         </div>
     </div>
@@ -387,8 +390,12 @@ const pageContent = document.getElementById('pageContent');
 const appointmentForm = document.getElementById('appointmentForm');
 const successMessage = document.getElementById('successMessage');
 const appointmentSchedule = document.getElementById('appointmentSchedule');
+const appointmentReference = document.getElementById('appointmentReference');
+const appointmentError = document.getElementById('appointmentError');
+const contactInfo = document.getElementById('contactInfo');
 const appointmentsList = document.getElementById('appointmentsList');
 const dateInput = document.getElementById('date');
+const timeSelect = document.getElementById('time'); 
 const medicalAttention = document.getElementById('medicalAttention');
 const otherAttentionGroup = document.getElementById('otherAttentionGroup');
 const otherAttention = document.getElementById('otherAttention');
@@ -399,11 +406,51 @@ const noDoctors = document.getElementById('noDoctors');
 const appointmentsStorageKey = 'senetizenAppointments';
 let selectedDoctorName = 'Barangay-Provided Doctor';
 
+// Set Minimum Date Constraint to Today
 const today = new Date();
 const year = today.getFullYear();
 const month = String(today.getMonth() + 1).padStart(2, '0');
 const day = String(today.getDate()).padStart(2, '0');
-dateInput.min = year + '-' + month + '-' + day;
+const currentDateString = year + '-' + month + '-' + day;
+dateInput.min = currentDateString;
+
+// Dynamic Time Slot Filtering Logic
+function validateTimeSlots() {
+    if (!timeSelect) return;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    // Reset slots back to active states by default
+    Array.from(timeSelect.options).forEach(option => {
+        if (option.value !== "") {
+            option.disabled = false;
+            option.style.color = ""; 
+        }
+    });
+
+    // If selected date matches today, evaluate operational hours
+    if (dateInput.value === currentDateString) {
+        Array.from(timeSelect.options).forEach(option => {
+            if (option.value === "") return; // Skip structural placeholders
+
+            // Split the option value (e.g., "08:00" -> 8, 0)
+            const [slotHour, slotMinute] = option.value.split(':').map(Number);
+
+            // Disable past hours or current hours whose threshold minutes have expired
+            if (slotHour < currentHour || (slotHour === currentHour && slotMinute <= currentMinute)) {
+                option.disabled = true;
+                option.style.color = "#cbd5e1"; // Clean UI fading effect
+            }
+        });
+
+        // Clear selection value if chosen option was disabled retroactively
+        if (timeSelect.selectedOptions[0] && timeSelect.selectedOptions[0].disabled) {
+            timeSelect.value = "";
+        }
+    }
+}
 
 function openAppointmentForm(doctorName){
     selectedDoctorName = doctorName || 'Barangay-Provided Doctor';
@@ -414,6 +461,9 @@ function openAppointmentForm(doctorName){
     successMessage.classList.remove('show');
     otherAttentionGroup.classList.remove('show');
     otherAttention.required = false;
+    clearAppointmentError();
+    appointmentReference.textContent = '';
+    validateTimeSlots(); // Execute immediate check on initial setup
 }
 
 function closeAppointmentForm(){
@@ -431,6 +481,47 @@ function saveAppointment(appointment){
     localStorage.setItem(appointmentsStorageKey, JSON.stringify(appointments));
 }
 
+function normalizePhoneNumber(phone){
+    let normalized = String(phone || '').trim();
+    if(normalized.startsWith('+63')){
+        normalized = '0' + normalized.slice(3);
+    }
+    return normalized;
+}
+
+function isValidPhoneNumber(phone){
+    const normalized = normalizePhoneNumber(phone);
+    return /^09\d{9}$/.test(normalized);
+}
+
+function showAppointmentError(message){
+    appointmentError.textContent = message;
+    appointmentError.style.display = 'block';
+}
+
+function clearAppointmentError(){
+    appointmentError.textContent = '';
+    appointmentError.style.display = 'none';
+    contactInfo.classList.remove('invalid-field');
+    if(timeSelect) timeSelect.classList.remove('invalid-field');
+}
+
+function hasOverlappingAppointment(appointment){
+    const appointments = getAppointments();
+    return appointments.some(existing =>
+        existing.doctorName === appointment.doctorName &&
+        existing.date === appointment.date &&
+        existing.time === appointment.time
+    );
+}
+
+// Fixed missing function parameter reference use case
+function generateReferenceNumber(){
+    const timestamp = Date.now().toString().slice(-6);
+    const randomId = Math.floor(1000 + Math.random() * 9000);
+    return `APPT-${timestamp}-${randomId}`;
+}
+
 function renderAppointments(){
     const appointments = getAppointments();
 
@@ -439,7 +530,13 @@ function renderAppointments(){
         return;
     }
 
-    appointmentsList.innerHTML = appointments.map(function(appointment){
+    const sortedAppointments = [...appointments].sort(function(a, b) {
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        return a.time.localeCompare(b.time);
+    });
+
+    appointmentsList.innerHTML = sortedAppointments.map(function(appointment){
         return `
             <div class="appointment-item">
                 <div class="appointment-date-box">
@@ -492,6 +589,8 @@ function closeEmergencyPanel(){
     pageContent.classList.remove('blurred');
 }
 
+// Bind Time Validation Observers
+dateInput.addEventListener('change', validateTimeSlots);
 
 menuToggle.addEventListener('click', function(){
     const isOpen = mainNav.classList.toggle('show');
@@ -566,6 +665,7 @@ function filterDoctors(){
     noDoctors.style.display = visibleDoctors === 0 ? 'block' : 'none';
 }
 
+// Fixed duplicate openMap references
 function openMap(){
     window.open(
         'https://www.google.com/maps/search/hospitals+near+San+Jose+Barangay+Hall+Antipolo',
@@ -590,7 +690,7 @@ document.querySelectorAll('.letters-only').forEach(function(input){
     });
 });
 
-const contactInfo = document.getElementById('contactInfo');
+// Fixed: Removed duplicate "const contactInfo" line here
 
 contactInfo.addEventListener('input', function(){
     this.value = this.value.replace(/\D/g, '').slice(0, 11);
@@ -607,6 +707,13 @@ medicalAttention.addEventListener('change', function(){
     }
 });
 
+/* File Upload Validation: type and size */
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+function formatFileSize(bytes){
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
 function isAcceptedImage(file){
     if(!file){
         return true;
@@ -619,18 +726,38 @@ function isAcceptedImage(file){
     return (file.type === '' || acceptedTypes.includes(file.type)) && acceptedExtensions.includes(extension);
 }
 
+function isAcceptedFileSize(file){
+    if(!file){
+        return true;
+    }
+
+    return file.size <= MAX_FILE_SIZE_BYTES;
+}
+
 function validateAttachments(){
     const firstFile = attachment1.files[0];
     const secondFile = attachment2.files[0];
 
     if(!isAcceptedImage(firstFile)){
-        alert('Attachment 1 must be JPEG, JPG, or PNG only.');
+        alert('Attachment 1 must be JPG, JPEG, or PNG only.');
         attachment1.value = '';
         return false;
     }
 
     if(!isAcceptedImage(secondFile)){
-        alert('Attachment 2 must be JPEG, JPG, or PNG only.');
+        alert('Attachment 2 must be JPG, JPEG, or PNG only.');
+        attachment2.value = '';
+        return false;
+    }
+
+    if(!isAcceptedFileSize(firstFile)){
+        alert(`Attachment 1 is too large (${formatFileSize(firstFile.size)}). Maximum file size: 5 MB.`);
+        attachment1.value = '';
+        return false;
+    }
+
+    if(!isAcceptedFileSize(secondFile)){
+        alert(`Attachment 2 is too large (${formatFileSize(secondFile.size)}). Maximum file size: 5 MB.`);
         attachment2.value = '';
         return false;
     }
@@ -661,6 +788,7 @@ function formatTime(timeValue){
     return selectedOption ? selectedOption.textContent : timeValue;
 }
 
+// Fixed missing structural function declaration
 function getDateParts(dateValue){
     const date = new Date(dateValue + 'T00:00:00');
     return {
@@ -681,32 +809,58 @@ function getFullName(){
 appointmentForm.addEventListener('submit', function(event){
     event.preventDefault();
 
+    clearAppointmentError();
+
     if(!validateAttachments()){
         return;
     }
 
     if(dateInput.value < dateInput.min){
-        alert('Please choose today or a future date only.');
+        showAppointmentError('Please choose today or a future date only.');
         return;
+    }
+
+    // Fail-Safe Time Constraint Verification Guard
+    if (dateInput.value === currentDateString && timeSelect) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const [selectedHour, selectedMinute] = timeSelect.value.split(':').map(Number);
+
+        if (selectedHour < currentHour || (selectedHour === currentHour && selectedMinute <= currentMinute)) {
+            alert('The selected time slot has already passed for today. Please choose an upcoming time.');
+            return;
+        }
     }
 
     const dateParts = getDateParts(dateInput.value);
     const selectedMedicalAttention = medicalAttention.value === 'Other' ? otherAttention.value.trim() : medicalAttention.value;
+    
+    // Fixed: Complete object setup & submission handler
     const appointment = {
-        fullName:getFullName(),
-        contactInfo:document.getElementById('contactInfo').value.trim(),
-        medicalAttention:selectedMedicalAttention,
-        doctorName:selectedDoctorName,
-        date:dateInput.value,
-        formattedDate:formatDate(dateInput.value),
-        time:formatTime(document.getElementById('time').value),
-        month:dateParts.month,
-        day:dateParts.day
+        fullName: getFullName(),
+        contactInfo: document.getElementById('contactInfo').value.trim(),
+        medicalAttention: selectedMedicalAttention,
+        doctorName: selectedDoctorName,
+        date: dateInput.value,
+        formattedDate: formatDate(dateInput.value),
+        time: formatTime(timeSelect.value),
+        month: dateParts.month,
+        day: dateParts.day
     };
 
+    if (hasOverlappingAppointment(appointment)) {
+        showAppointmentError('This time slot is already booked for this doctor. Please pick another.');
+        return;
+    }
+
+    const referenceNum = generateReferenceNumber();
     saveAppointment(appointment);
 
-    appointmentSchedule.textContent = appointment.formattedDate + ' at ' + appointment.time + ' with ' + appointment.doctorName;
+    // Update UI Elements with details
+    appointmentSchedule.innerHTML = `<strong>Schedule:</strong> ${appointment.formattedDate} at ${appointment.time}`;
+    appointmentReference.innerHTML = `<strong>Reference Code:</strong> ${referenceNum}`;
+    
     appointmentForm.style.display = 'none';
     successMessage.classList.add('show');
 });
@@ -714,10 +868,3 @@ appointmentForm.addEventListener('submit', function(event){
 
 </body>
 </html>
-
-
-
-
-
-
-

@@ -40,7 +40,7 @@ let localCitizensCache = [
     }
 ];
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = window.API_BASE;
 
 function getAdminToken() {
     const storedAuth = JSON.parse(localStorage.getItem('barangay_admin_auth') || 'null');

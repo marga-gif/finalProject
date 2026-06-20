@@ -1,5 +1,5 @@
 // 1. DATA CACHE CORES (Restored so the Publish Button has somewhere to save data)
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = window.API_BASE;
 
 let localEventsCache = [
     { id: "evt_001", title: "Quarterly Health & Wellness Checkup", scheduleDate: "2026-06-20", timeScope: "08:00 AM", location: "Barangay San Jose Gym", totalRsvps: 38, targetSlots: 100, status: "Upcoming", typeTag: "Medical Assistance" },
