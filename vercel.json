@@ -1,13 +1,3 @@
 {
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/", "destination": "/html/index.html" },
-    { "source": "/Aboutus", "destination": "/html/Aboutus.html" },
-    { "source": "/finance", "destination": "/html/finance.html" },
-    { "source": "/gov", "destination": "/html/gov.html" },
-    { "source": "/login", "destination": "/html/login.html" },
-    { "source": "/Medical", "destination": "/html/Medical.html" },
-    { "source": "/register", "destination": "/html/register.html" },
-    { "source": "/Socialwellness", "destination": "/html/Socialwellness.html" }
-  ]
+  "cleanUrls": true
 }
