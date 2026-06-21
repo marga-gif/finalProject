@@ -1,7 +1,7 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/", "destination": "/git puhtml/index.html" },
+    { "source": "/", "destination": "/html/index.html" },
     { "source": "/css/(.*)", "destination": "/css/$1" },
     { "source": "/images/(.*)", "destination": "/images/$1" },
     { "source": "/admin/(.*)", "destination": "/admin/$1" },
