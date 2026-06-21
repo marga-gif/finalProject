@@ -95,6 +95,7 @@ body{
     border-radius:18px;
     box-shadow:0 2px 12px rgba(0,0,0,.08);
     overflow:hidden;
+    height: 500px;
 }
 
 .contact-card{
@@ -147,64 +148,31 @@ body{
     font-size:30px;
 }
 
-
-.mission-card{
-    border:2px solid #0c6b36;
-    background:#e8f5e9;
-    text-align:center;
-    padding:50px 40px;
+.org-card {
+    background: #e8f5e9;
+    border: 2px solid #0c6b36;
+    margin-top: 10px;
+    padding: 30px;          
+    border-radius: 18px;
+    text-align: center;
+    width: 300%;
+    max-width: 900px;            
+    margin-left: 70px;        
+    margin-right: auto;
 }
 
-.mission-card h2{
-    color:#0c7735;
-    margin-bottom:20px;
+.org-card h2 {
+    color: #0c7735;
+    margin-bottom: 40px;
 }
 
-.mission-card p{
-    line-height:2;
-}
-
-.vision-card{
-    background:#032b5b;
-    color:white;
-    text-align:center;
-    padding:50px 40px;
-}
-
-.vision-card h2{
-    margin-bottom:20px;
-}
-
-.vision-card p{
-    line-height:2;
-}
-
-.icon{
-    font-size:55px;
-    margin-bottom:20px;
-}
-
-.org-card{
-    background:#e8f5e9;
-    border:2px solid #0c6b36;
-    margin-top:50px;
-    padding:20px;
-    border-radius:18px;
-    text-align:center;
-}
-
-.org-card h2{
-    color:#0c7735;
-    margin-bottom:40px;
-}
-
-.org-image{
-    width:60%;
-    max-width:650px;
-    display:block;
-    margin:auto;
-    border-radius:25px;
-    box-shadow:0 4px 15px rgba(0,0,0,.1);
+.org-image {
+    width: 100%;                
+    max-width: 900px;          
+    display: block;
+    margin: auto;
+    border-radius: 25px;
+    box-shadow: 0 4px 15px rgba(0,0,0,.1);
 }
 
 @media(max-width:900px){
